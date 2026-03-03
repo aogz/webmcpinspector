@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MCP Inspector</title>
+    <script>
+      (function (w, e, b, f, u, s) {
+        w[f] = w[f] || {
+          initSpace: function () {
+            return new Promise(function (resolve) {
+              w[f].q = arguments;
+              w[f].resolve = resolve;
+            });
+          },
+        };
+        u = e.createElement(b);
+        s = e.getElementsByTagName(b)[0];
+        u.async = 1;
+        u.src = 'https://webfu.se/surfly.js';
+        s.parentNode.insertBefore(u, s);
+      })(window, document, 'script', 'webfuse');
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
