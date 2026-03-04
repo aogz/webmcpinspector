@@ -17,6 +17,7 @@ interface WebfuseSession {
   end(redirectUrl?: string): void;
   on(eventName: string, callback: (...args: unknown[]) => void): WebfuseSession;
   sendMessage(message: unknown, targetOrigin: string): void;
+  broadcastMessage(message: unknown): void;
 }
 
 interface WebfuseSpace {

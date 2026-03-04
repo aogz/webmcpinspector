@@ -13,12 +13,12 @@ export default function MainContent({ connected, connecting }: MainContentProps)
           title="Webfuse Session"
         />
         {!connected && !connecting && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-gray-50">
             Enter a URL and click Connect to start a session
           </div>
         )}
-        {connecting && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+        {connecting && !connected && (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm bg-gray-50">
             <div className="flex items-center gap-2">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />

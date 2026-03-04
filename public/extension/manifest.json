@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "WebMCP Inspector",
+  "version": "1.0.0",
+  "description": "Scans forms and imperative tools for WebMCP inspection",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
