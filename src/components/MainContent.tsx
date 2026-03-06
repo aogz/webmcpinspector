@@ -1,9 +1,35 @@
+import type { HistoryEntry } from "../types";
+
 interface MainContentProps {
   connected: boolean;
   connecting: boolean;
+  history: HistoryEntry[];
 }
 
-export default function MainContent({ connected, connecting }: MainContentProps) {
+const typeColors: Record<HistoryEntry["type"], string> = {
+  connected: "text-green-600",
+  disconnected: "text-red-500",
+  tools_discovered: "text-blue-600",
+  tool_augmented: "text-purple-600",
+  tool_cleared: "text-amber-600",
+  tab_opened: "text-gray-600",
+};
+
+const typeLabels: Record<HistoryEntry["type"], string> = {
+  connected: "CONNECTED",
+  disconnected: "DISCONNECTED",
+  tools_discovered: "DISCOVERED",
+  tool_augmented: "AUGMENTED",
+  tool_cleared: "CLEARED",
+  tab_opened: "TAB",
+};
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+export default function MainContent({ connected, connecting, history }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
       <div className="flex-1 min-h-0 relative">
@@ -30,18 +56,26 @@ export default function MainContent({ connected, connecting }: MainContentProps)
         )}
       </div>
 
-      <div className="h-[200px] min-h-[200px] border-t border-gray-200 flex">
-        <div className="flex-1 p-4 border-r border-gray-200 overflow-auto">
+      <div className="h-[200px] min-h-[200px] border-t border-gray-200 overflow-auto">
+        <div className="p-4">
           <h3 className="text-base font-semibold text-gray-900 mb-2">
             History
           </h3>
-          <p className="text-sm text-gray-400 italic">No history yet</p>
-        </div>
-        <div className="flex-1 p-4 overflow-auto">
-          <h3 className="text-base font-semibold text-gray-900 mb-2">
-            Server Notifications
-          </h3>
-          <p className="text-sm text-gray-400 italic">No notifications yet</p>
+          {history.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No history yet</p>
+          ) : (
+            <div className="space-y-1">
+              {history.map((entry, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="text-gray-400 shrink-0 font-mono">{formatTime(entry.timestamp)}</span>
+                  <span className={`shrink-0 font-semibold ${typeColors[entry.type]}`}>
+                    {typeLabels[entry.type]}
+                  </span>
+                  <span className="text-gray-600 truncate">{entry.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

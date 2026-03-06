@@ -8,6 +8,7 @@ let savedOutline = '';
 let savedBoxShadow = '';
 let savedTransition = '';
 let imperativeTools = [];
+let isAnimating = false;
 
 // ── Imperative API Watcher ──────────────────────────────────────────
 if (typeof navigator !== 'undefined' && 'modelContext' in navigator) {
@@ -21,6 +22,173 @@ if (typeof navigator !== 'undefined' && 'modelContext' in navigator) {
     sendToolsUpdate();
     return originalRegisterTool.apply(this, arguments);
   };
+}
+
+// ── Scan Animation ──────────────────────────────────────────────────
+function showScanAnimation() {
+  if (isAnimating) return;
+  isAnimating = true;
+
+  // Remove any leftover overlay
+  var old = document.getElementById('webmcp-scan-overlay');
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+
+  // Inject keyframes once
+  if (!document.getElementById('webmcp-scan-style')) {
+    var style = document.createElement('style');
+    style.id = 'webmcp-scan-style';
+    style.textContent =
+      '@keyframes webmcp-dust-shimmer{0%{opacity:0.5;filter:blur(32px)}50%{opacity:0.85;filter:blur(22px)}100%{opacity:0.5;filter:blur(32px)}}' +
+      '@keyframes webmcp-form-glow-in{0%{box-shadow:0 0 0 0 rgba(59,130,246,0),0 0 0 0 rgba(59,130,246,0)}' +
+      '40%{box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 0 20px 4px rgba(99,160,255,0.18)}' +
+      '100%{box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 0 20px 4px rgba(99,160,255,0.18)}}' +
+      '@keyframes webmcp-form-glow-out{0%{box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 0 20px 4px rgba(99,160,255,0.18)}' +
+      '100%{box-shadow:0 0 0 0 rgba(59,130,246,0),0 0 0 0 rgba(59,130,246,0)}}';
+    document.head.appendChild(style);
+  }
+
+  // Create the dust cloud element — 65% of viewport, dispersed light-blue dust
+  var cloudHeight = Math.round(window.innerHeight * 0.65);
+  var dust = document.createElement('div');
+  dust.id = 'webmcp-scan-overlay';
+  dust.style.cssText =
+    'position:fixed;left:0;right:0;height:' + cloudHeight + 'px;z-index:2147483647;pointer-events:none;' +
+    'top:-' + cloudHeight + 'px;' +
+    'background:' +
+    'radial-gradient(ellipse 60% 35% at 20% 30%, rgba(147,197,253,0.25) 0%, transparent 70%),' +
+    'radial-gradient(ellipse 50% 30% at 75% 55%, rgba(147,197,253,0.22) 0%, transparent 70%),' +
+    'radial-gradient(ellipse 70% 25% at 45% 70%, rgba(130,180,255,0.18) 0%, transparent 70%),' +
+    'radial-gradient(ellipse 40% 40% at 85% 25%, rgba(165,200,255,0.20) 0%, transparent 70%),' +
+    'radial-gradient(ellipse 45% 35% at 30% 65%, rgba(140,190,255,0.16) 0%, transparent 70%),' +
+    'linear-gradient(180deg,' +
+    'transparent 0%,' +
+    'rgba(147,197,253,0.08) 10%,' +
+    'rgba(130,185,255,0.18) 30%,' +
+    'rgba(120,175,255,0.24) 50%,' +
+    'rgba(130,185,255,0.18) 70%,' +
+    'rgba(147,197,253,0.08) 90%,' +
+    'transparent 100%);' +
+    'animation:webmcp-dust-shimmer 0.9s ease-in-out infinite;';
+  document.documentElement.appendChild(dust);
+
+  // Create the counter badge
+  var badge = document.createElement('div');
+  badge.id = 'webmcp-scan-badge';
+  var discoveredCount = 0;
+  var totalForms = document.querySelectorAll('form').length;
+  badge.innerHTML =
+    '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(59,130,246,0.8);margin-right:8px;vertical-align:middle;' +
+    'box-shadow:0 0 6px rgba(59,130,246,0.4);transition:background 0.4s ease,box-shadow 0.4s ease" id="webmcp-badge-dot"></span>' +
+    '<span id="webmcp-badge-text" style="vertical-align:middle">Tools discovered: 0</span>';
+  badge.style.cssText =
+    'position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:none;' +
+    'padding:8px 16px;border-radius:12px;font-size:12px;font-weight:500;letter-spacing:0.02em;' +
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+    'background:rgba(255,255,255,0.7);color:rgba(55,65,81,0.9);' +
+    'border:1px solid rgba(59,130,246,0.12);' +
+    'backdrop-filter:blur(16px) saturate(1.8);-webkit-backdrop-filter:blur(16px) saturate(1.8);' +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.06);' +
+    'transition:background 0.5s ease,color 0.5s ease,border-color 0.5s ease,box-shadow 0.5s ease,transform 0.2s ease;' +
+    'transform:translateY(0);';
+  document.documentElement.appendChild(badge);
+
+  function updateBadge() {
+    discoveredCount++;
+    var textEl = document.getElementById('webmcp-badge-text');
+    var dotEl = document.getElementById('webmcp-badge-dot');
+    if (textEl) textEl.textContent = 'Tools discovered: ' + discoveredCount;
+
+    // Subtle pop animation on each increment
+    badge.style.transform = 'translateY(-1px) scale(1.03)';
+    setTimeout(function () { badge.style.transform = 'translateY(0) scale(1)'; }, 200);
+
+    if (discoveredCount >= totalForms) {
+      badge.style.background = 'rgba(240,253,244,0.75)';
+      badge.style.color = 'rgba(21,128,61,0.9)';
+      badge.style.borderColor = 'rgba(22,163,74,0.15)';
+      badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04),0 8px 24px rgba(22,163,74,0.08)';
+      if (dotEl) {
+        dotEl.style.background = 'rgba(22,163,74,0.8)';
+        dotEl.style.boxShadow = '0 0 6px rgba(22,163,74,0.4)';
+      }
+    }
+  }
+
+  // Gather all forms and their document-top offsets
+  var forms = document.querySelectorAll('form');
+  var formData = [];
+  forms.forEach(function (form) {
+    var rect = form.getBoundingClientRect();
+    var absTop = rect.top + window.scrollY;
+    formData.push({ el: form, absTop: absTop, height: rect.height, highlighted: false });
+  });
+  formData.sort(function (a, b) { return a.absTop - b.absTop; });
+
+  var totalHeight = document.documentElement.scrollHeight;
+  var viewportHeight = window.innerHeight;
+  var duration = Math.min(Math.max(totalHeight * 1.5, 1800), 6000);
+  var startTime = null;
+  var startScroll = window.scrollY;
+
+  function animateFrame(timestamp) {
+    if (!startTime) startTime = timestamp;
+    var elapsed = timestamp - startTime;
+    var progress = Math.min(elapsed / duration, 1);
+    // Ease in-out cubic
+    var eased = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+    // Current scan position in document coordinates
+    var scanY = eased * totalHeight;
+
+    // Position the dust cloud relative to the viewport
+    var scrollTarget = Math.max(0, scanY - viewportHeight * 0.35);
+    scrollTarget = Math.min(scrollTarget, totalHeight - viewportHeight);
+    window.scrollTo(0, scrollTarget);
+
+    var dustViewportY = scanY - window.scrollY - cloudHeight * 0.5;
+    dust.style.top = dustViewportY + 'px';
+
+    // Highlight forms as the dust reaches them
+    for (var i = 0; i < formData.length; i++) {
+      var fd = formData[i];
+      if (!fd.highlighted && scanY >= fd.absTop) {
+        fd.highlighted = true;
+        updateBadge();
+        (function (el) {
+          el.style.animation = 'none';
+          el.style.animation = 'webmcp-form-glow-in 0.4s ease-out forwards';
+          setTimeout(function () {
+            el.style.animation = 'webmcp-form-glow-out 0.6s ease-in forwards';
+            setTimeout(function () {
+              el.style.animation = '';
+              el.style.boxShadow = '';
+            }, 600);
+          }, 800);
+        })(fd.el);
+      }
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(animateFrame);
+    } else {
+      // Fade out dust and badge
+      dust.style.transition = 'opacity 0.3s ease-out';
+      dust.style.opacity = '0';
+      setTimeout(function () {
+        badge.style.transition = 'opacity 0.5s ease-out';
+        badge.style.opacity = '0';
+      }, 800);
+      setTimeout(function () {
+        if (dust.parentNode) dust.parentNode.removeChild(dust);
+        if (badge.parentNode) badge.parentNode.removeChild(badge);
+        isAnimating = false;
+      }, 1500);
+    }
+  }
+
+  requestAnimationFrame(animateFrame);
 }
 
 // ── Form Scanning ───────────────────────────────────────────────────
@@ -322,7 +490,22 @@ function getGeneratedSchema(formIndex) {
 })(window, document, 'script', 'webfuse');
 
 // ── Webfuse Messaging ───────────────────────────────────────────────
+function sendToolsUpdateQuiet() {
+  var forms = scanForms();
+  console.log('[WebMCP content.js] quiet update:', forms.length, 'forms');
+  try {
+    webfuse.currentSession.sendMessage({
+      type: 'webmcp:tools-update',
+      forms: forms,
+      imperativeTools: imperativeTools,
+    }, '*');
+  } catch (e) {
+    console.warn('[WebMCP content.js] sendMessage FAILED:', e);
+  }
+}
+
 function sendToolsUpdate() {
+  showScanAnimation();
   var forms = scanForms();
   console.log('[WebMCP content.js] scanForms result:', forms.length, 'forms found', forms);
   try {
@@ -372,7 +555,7 @@ function handleMessage(session, event) {
         data.attrValue,
         data.isWebfuseApplied
       );
-      sendToolsUpdate();
+      sendToolsUpdateQuiet();
       break;
 
     case 'webmcp:set-input-attr':
@@ -383,12 +566,12 @@ function handleMessage(session, event) {
         data.attrValue,
         data.isWebfuseApplied
       );
-      sendToolsUpdate();
+      sendToolsUpdateQuiet();
       break;
 
     case 'webmcp:apply-attrs':
       applyAttributes(data.forms);
-      sendToolsUpdate();
+      sendToolsUpdateQuiet();
       break;
 
     case 'webmcp:get-schema':
@@ -432,11 +615,9 @@ var SPACE_ID = '1798';
     console.log('[WebMCP content.js] Setting up message listener');
     webfuse.currentSession.on('message', handleMessage);
 
-    // Initial scan after a short delay to let the page settle
-    setTimeout(function () {
-      console.log('[WebMCP content.js] Running initial sendToolsUpdate');
-      sendToolsUpdate();
-    }, 500);
+    // Send the buffered scan that ran at content-script load time
+    console.log('[WebMCP content.js] Sending buffered initial scan');
+    sendToolsUpdate();
 
     // Re-scan on dynamic DOM changes (debounced)
     var debounceTimer = null;
@@ -444,7 +625,7 @@ var SPACE_ID = '1798';
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () {
         console.log('[WebMCP content.js] MutationObserver triggered rescan');
-        sendToolsUpdate();
+        sendToolsUpdateQuiet();
       }, 1000);
     });
 

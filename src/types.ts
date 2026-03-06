@@ -41,6 +41,12 @@ export interface SavedPageOverrides {
   [url: string]: SavedFormOverride[];
 }
 
+export interface HistoryEntry {
+  timestamp: number;
+  type: "connected" | "disconnected" | "tools_discovered" | "tool_augmented" | "tool_cleared" | "tab_opened";
+  message: string;
+}
+
 export interface SchemaResponse {
   formIndex: number;
   schema: {

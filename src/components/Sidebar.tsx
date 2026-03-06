@@ -9,6 +9,7 @@ import {
   FileJson,
   Save,
   Wrench,
+  Undo2,
 } from "lucide-react";
 import TabBar from "./TabBar";
 import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride } from "../types";
@@ -25,6 +26,7 @@ interface SidebarProps {
   schemaResponse: SchemaResponse | null;
   sendToSession: (msg: Record<string, unknown>) => void;
   onSaveOverrides: (override: SavedFormOverride) => void;
+  onClearOverrides: (form: FormTool) => void;
 }
 
 export default function Sidebar({
@@ -39,6 +41,7 @@ export default function Sidebar({
   schemaResponse,
   sendToSession,
   onSaveOverrides,
+  onClearOverrides,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
@@ -169,6 +172,7 @@ export default function Sidebar({
                   sendToSession={sendToSession}
                   schemaResponse={schemaResponse}
                   onSaveOverrides={onSaveOverrides}
+                  onClearOverrides={onClearOverrides}
                 />
               ))}
             </div>
@@ -205,11 +209,13 @@ function FormCard({
   sendToSession,
   schemaResponse,
   onSaveOverrides,
+  onClearOverrides,
 }: {
   form: FormTool;
   sendToSession: (msg: Record<string, unknown>) => void;
   schemaResponse: SchemaResponse | null;
   onSaveOverrides: (override: SavedFormOverride) => void;
+  onClearOverrides: (form: FormTool) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showSchema, setShowSchema] = useState(false);
@@ -332,9 +338,21 @@ function FormCard({
             </span>
           )}
           {form.webfuseApplied && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-              WF
-            </span>
+            <>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                WF
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearOverrides(form);
+                }}
+                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                title="Remove augmented attributes and restore original"
+              >
+                <Undo2 className="w-3 h-3" /> Reset
+              </button>
+            </>
           )}
           {!form.hasWebMCP && !form.webfuseApplied && (
             <button

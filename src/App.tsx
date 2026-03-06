@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
-import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides } from "./types";
+import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides, HistoryEntry } from "./types";
 
 const STORAGE_KEY = "webmcp-overrides";
 const URL_STORAGE_KEY = "webmcp-last-url";
@@ -88,11 +88,15 @@ export default function App() {
   const [schemaResponse, setSchemaResponse] = useState<SchemaResponse | null>(
     null
   );
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const sessionRef = useRef<WebfuseSession | null>(null);
   const spaceRef = useRef<WebfuseSpace | null>(null);
-  const restoredUrlRef = useRef<string | null>(null);
   const urlRef = useRef(url);
   urlRef.current = url;
+
+  const addHistory = useCallback((type: HistoryEntry["type"], message: string) => {
+    setHistory((prev) => [{ timestamp: Date.now(), type, message }, ...prev]);
+  }, []);
 
   const sendToSession = useCallback((msg: Record<string, unknown>) => {
     if (sessionRef.current) {
@@ -104,14 +108,54 @@ export default function App() {
     const targetUrl = normalizeUrl(urlRef.current);
     if (!targetUrl) return;
     saveOverrideForUrl(targetUrl, override);
-    console.log("[WebMCP] Saved overrides for", targetUrl, override);
-  }, []);
+    addHistory("tool_augmented", `${override.formId} on ${targetUrl}`);
+  }, [addHistory]);
+
+  const handleClearOverrides = useCallback((form: FormTool) => {
+    // Remove saved overrides for this form
+    const targetUrl = normalizeUrl(urlRef.current);
+    if (targetUrl) {
+      const all = loadAllOverrides();
+      const key = normalizeUrl(targetUrl);
+      if (all[key]) {
+        all[key] = all[key].filter((o) => o.formId !== form.formId);
+        if (all[key].length === 0) delete all[key];
+        saveAllOverrides(all);
+      }
+    }
+    // Clear each augmented attribute on the form by sending empty values
+    if (sessionRef.current) {
+      for (const attrName of ["toolname", "tooldescription", "toolautosubmit"]) {
+        sessionRef.current.sendMessage({
+          type: "webmcp:set-form-attr",
+          formIndex: form.index,
+          attrName,
+          attrValue: "",
+          isWebfuseApplied: false,
+        }, "*");
+      }
+      // Clear input-level attributes
+      for (const input of form.inputs) {
+        for (const attrName of ["toolparamtitle", "toolparamdescription"]) {
+          sessionRef.current.sendMessage({
+            type: "webmcp:set-input-attr",
+            formIndex: form.index,
+            inputIndex: input.index,
+            attrName,
+            attrValue: "",
+            isWebfuseApplied: false,
+          }, "*");
+        }
+      }
+      // Trigger a rescan so the form list refreshes
+      sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
+    }
+    addHistory("tool_cleared", `${form.toolname || form.formId} on ${normalizeUrl(urlRef.current)}`);
+  }, [addHistory]);
 
   const restoreOverrides = useCallback((incomingForms: FormTool[]) => {
     const targetUrl = normalizeUrl(urlRef.current);
     if (!targetUrl) return;
-    if (restoredUrlRef.current === targetUrl) return;
-    restoredUrlRef.current = targetUrl;
 
     const saved = getOverridesForUrl(targetUrl);
     if (!saved.length) return;
@@ -120,6 +164,13 @@ export default function App() {
     for (const override of saved) {
       const liveForm = incomingForms.find((f) => f.formId === override.formId);
       if (!liveForm) continue;
+
+      // Check if this form already has the overrides applied
+      const alreadyApplied = liveForm.webfuseApplied &&
+        Object.entries(override.attributes).every(
+          ([key, val]) => (liveForm as unknown as Record<string, string>)[key] === val
+        );
+      if (alreadyApplied) continue;
 
       const formAttrs: Record<string, { value: string; webfuseApplied: boolean }> = {};
       for (const [key, val] of Object.entries(override.attributes)) {
@@ -168,12 +219,18 @@ export default function App() {
         sessionRef.current.closeTab(tab.ssid);
       }
       sessionRef.current.openTab(targetUrl);
-      restoredUrlRef.current = null;
+      addHistory("tab_opened", targetUrl);
+
+      // Request a scan after the new tab loads
+      setTimeout(() => {
+        if (sessionRef.current) {
+          sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
+        }
+      }, 1500);
       return;
     }
 
     setConnecting(true);
-    restoredUrlRef.current = null;
 
     try {
       // Initialize space if not done yet
@@ -194,6 +251,7 @@ export default function App() {
         setForms([]);
         setImperativeTools([]);
         sessionRef.current = null;
+        addHistory("disconnected", "Session ended");
       });
 
       // Listen for messages from the extension
@@ -228,11 +286,16 @@ export default function App() {
         switch (data.type) {
           case "webmcp:tools-update": {
             const incomingForms = (data.forms as FormTool[]) || [];
+            const incomingImperative = (data.imperativeTools as ImperativeTool[]) || [];
             setForms(incomingForms);
-            setImperativeTools(
-              (data.imperativeTools as ImperativeTool[]) || []
-            );
+            setImperativeTools(incomingImperative);
             restoreOverrides(incomingForms);
+            const nativeMcp = incomingForms.filter((f) => f.hasWebMCP && !f.webfuseApplied).length;
+            const augmented = incomingForms.filter((f) => f.webfuseApplied).length;
+            const parts = [`${incomingForms.length} forms`, `${incomingImperative.length} imperative`];
+            if (nativeMcp > 0) parts.push(`${nativeMcp} native MCP`);
+            if (augmented > 0) parts.push(`${augmented} augmented`);
+            addHistory("tools_discovered", `${urlRef.current} — ${parts.join(", ")}`);
             break;
           }
           case "webmcp:schema":
@@ -256,8 +319,17 @@ export default function App() {
       // Mark connected immediately after start resolves
       setConnected(true);
       setConnecting(false);
+      addHistory("connected", `Session started for ${targetUrl}`);
 
       await openTabPromise;
+      addHistory("tab_opened", targetUrl);
+
+      // Request a scan from the content script after the tab loads
+      setTimeout(() => {
+        if (sessionRef.current) {
+          sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
+        }
+      }, 1500);
     } catch (error) {
       console.error("Failed to start Webfuse session:", error);
       setConnecting(false);
@@ -278,8 +350,9 @@ export default function App() {
         schemaResponse={schemaResponse}
         sendToSession={sendToSession}
         onSaveOverrides={handleSaveOverrides}
+        onClearOverrides={handleClearOverrides}
       />
-      <MainContent connected={connected} connecting={connecting} />
+      <MainContent connected={connected} connecting={connecting} history={history} />
     </div>
   );
 }
