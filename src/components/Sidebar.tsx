@@ -11,10 +11,11 @@ import {
   Wrench,
 } from "lucide-react";
 import TabBar from "./TabBar";
-import type { FormTool, ImperativeTool, SchemaResponse } from "../types";
+import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride } from "../types";
 
 interface SidebarProps {
   url: string;
+  urlHistory: string[];
   onUrlChange: (url: string) => void;
   onConnect: () => void;
   connected: boolean;
@@ -23,10 +24,12 @@ interface SidebarProps {
   imperativeTools: ImperativeTool[];
   schemaResponse: SchemaResponse | null;
   sendToSession: (msg: Record<string, unknown>) => void;
+  onSaveOverrides: (override: SavedFormOverride) => void;
 }
 
 export default function Sidebar({
   url,
+  urlHistory,
   onUrlChange,
   onConnect,
   connected,
@@ -35,8 +38,10 @@ export default function Sidebar({
   imperativeTools,
   schemaResponse,
   sendToSession,
+  onSaveOverrides,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
 
   const nativeCount = forms.filter((f) => f.hasWebMCP && !f.webfuseApplied).length;
   const webfuseCount = forms.filter((f) => f.webfuseApplied).length;
@@ -51,7 +56,7 @@ export default function Sidebar({
 
       {/* URL + Connect */}
       <div className="px-4 py-3 space-y-3 border-b border-gray-100">
-        <div>
+        <div className="relative">
           <label className="block text-xs font-medium text-gray-500 mb-1">
             URL
           </label>
@@ -59,12 +64,37 @@ export default function Sidebar({
             type="text"
             value={url}
             onChange={(e) => onUrlChange(e.target.value)}
+            onFocus={() => urlHistory.length > 0 && setShowHistory(true)}
+            onBlur={() => setTimeout(() => setShowHistory(false), 150)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !connecting) onConnect();
+              if (e.key === "Enter" && !connecting) {
+                setShowHistory(false);
+                onConnect();
+              }
+              if (e.key === "Escape") setShowHistory(false);
             }}
             placeholder="https://example.com"
             className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
+          {showHistory && urlHistory.length > 0 && (
+            <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+              {urlHistory
+                .filter((u) => u.toLowerCase().includes(url.toLowerCase()))
+                .map((historyUrl) => (
+                  <button
+                    key={historyUrl}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onUrlChange(historyUrl);
+                      setShowHistory(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 truncate cursor-pointer"
+                  >
+                    {historyUrl}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
 
         <button
@@ -76,12 +106,16 @@ export default function Sidebar({
           {connecting ? "Connecting..." : connected ? "Open Tab" : "Connect"}
         </button>
 
-        {connected && (
-          <div className="flex items-center gap-2 justify-center">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs text-green-600">Connected</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 justify-center">
+          <span className={`w-2 h-2 rounded-full ${
+            connecting ? "bg-yellow-500 animate-pulse" : connected ? "bg-green-500" : "bg-gray-400"
+          }`} />
+          <span className={`text-xs ${
+            connecting ? "text-yellow-600" : connected ? "text-green-600" : "text-gray-400"
+          }`}>
+            {connecting ? "Connecting" : connected ? "Connected" : "Disconnected"}
+          </span>
+        </div>
       </div>
 
       {/* Stats bar + Rescan */}
@@ -104,10 +138,10 @@ export default function Sidebar({
           </div>
           <button
             onClick={() => sendToSession({ type: "webmcp:scan" })}
-            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-            title="Rescan page"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 rounded-md transition-colors cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3 h-3" />
+            Rescan page
           </button>
         </div>
       )}
@@ -134,6 +168,7 @@ export default function Sidebar({
                   form={form}
                   sendToSession={sendToSession}
                   schemaResponse={schemaResponse}
+                  onSaveOverrides={onSaveOverrides}
                 />
               ))}
             </div>
@@ -160,10 +195,12 @@ function FormCard({
   form,
   sendToSession,
   schemaResponse,
+  onSaveOverrides,
 }: {
   form: FormTool;
   sendToSession: (msg: Record<string, unknown>) => void;
   schemaResponse: SchemaResponse | null;
+  onSaveOverrides: (override: SavedFormOverride) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showSchema, setShowSchema] = useState(false);
@@ -213,6 +250,33 @@ function FormCard({
         });
       }
     }
+    // Build merged override snapshot and persist
+    const mergedAttrs: Record<string, string> = {};
+    for (const key of ["toolname", "tooldescription", "toolautosubmit"] as const) {
+      const val = edits[key] ?? (form as unknown as Record<string, string>)[key] ?? "";
+      if (val) mergedAttrs[key] = val;
+    }
+
+    const mergedInputs: Record<string, Record<string, string>> = {};
+    for (const input of form.inputs) {
+      const inputKey = input.name || input.id || `__idx_${input.index}`;
+      const merged: Record<string, string> = {};
+      for (const key of ["toolparamtitle", "toolparamdescription"] as const) {
+        const val =
+          inputEdits[input.index]?.[key] ??
+          (input as unknown as Record<string, string>)[key] ??
+          "";
+        if (val) merged[key] = val;
+      }
+      if (Object.keys(merged).length) mergedInputs[inputKey] = merged;
+    }
+
+    onSaveOverrides({
+      formId: form.formId,
+      attributes: mergedAttrs,
+      inputs: mergedInputs,
+    });
+
     setEdits({});
     setInputEdits({});
   };

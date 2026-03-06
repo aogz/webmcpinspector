@@ -31,6 +31,16 @@ export interface ImperativeTool {
   inputSchema: Record<string, unknown>;
 }
 
+export interface SavedFormOverride {
+  formId: string;
+  attributes: Record<string, string>;
+  inputs: Record<string, Record<string, string>>; // keyed by input name||id
+}
+
+export interface SavedPageOverrides {
+  [url: string]: SavedFormOverride[];
+}
+
 export interface SchemaResponse {
   formIndex: number;
   schema: {
