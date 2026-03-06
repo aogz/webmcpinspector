@@ -161,9 +161,14 @@ export default function App() {
     addUrlToHistory(targetUrl);
     setUrlHistory(loadUrlHistory());
 
-    // If we already have a running session, open a new tab
+    // If we already have a running session, close existing tabs then open new one
     if (connected && sessionRef.current) {
+      const tabs = await sessionRef.current.getTabs();
+      for (const tab of tabs) {
+        sessionRef.current.closeTab(tab.ssid);
+      }
       sessionRef.current.openTab(targetUrl);
+      restoredUrlRef.current = null;
       return;
     }
 
