@@ -51,7 +51,7 @@ export default function Sidebar({
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
         <Settings className="w-5 h-5 text-gray-500" />
-        <h1 className="text-lg font-semibold text-gray-900">MCP Inspector</h1>
+        <h1 className="text-lg font-semibold text-gray-900">WebMCP Inspector</h1>
       </div>
 
       {/* URL + Connect */}
