@@ -185,6 +185,15 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Powered by Webfuse */}
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-center gap-2">
+        <span className="text-xs text-gray-400">Powered by</span>
+        <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>
+          <img src="https://www.webfuse.com/logo.svg" alt="Webfuse" className="h-4" />
+        </a>
+      </div>
     </aside>
   );
 }
