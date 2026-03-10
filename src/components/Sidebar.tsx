@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import TabBar from "./TabBar";
+import { track } from "../analytics";
 import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride } from "../types";
 
 interface SidebarProps {
@@ -140,7 +141,7 @@ export default function Sidebar({
             )}
           </div>
           <button
-            onClick={() => sendToSession({ type: "webmcp:scan" })}
+            onClick={() => { track("Rescan Page"); sendToSession({ type: "webmcp:scan" }); }}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 rounded-md transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />
@@ -153,7 +154,7 @@ export default function Sidebar({
       <TabBar
         tabs={["Declarative Tools", "Imperative Tools"]}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => { track("Tab Switch", { tab: tab === 0 ? "declarative" : "imperative" }); setActiveTab(tab); }}
       />
 
       {/* Tool cards */}
@@ -192,10 +193,10 @@ export default function Sidebar({
 
       {/* Powered by Webfuse */}
       <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-center gap-2">
-        <span className="text-xs text-gray-400">Powered by</span>
+        <span className="text-sm text-gray-400">Powered by</span>
         <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>
-          <img src="https://www.webfuse.com/logo.svg" alt="Webfuse" className="h-4" />
+          <span className="text-base font-semibold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>
+          <img src="https://www.webfuse.com/logo.svg" alt="Webfuse" className="h-5" />
         </a>
       </div>
     </aside>
@@ -345,6 +346,7 @@ function FormCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  track("Reset Form", { tool: form.toolname || form.formId });
                   onClearOverrides(form);
                 }}
                 className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
@@ -356,7 +358,7 @@ function FormCard({
           )}
           {!form.hasWebMCP && !form.webfuseApplied && (
             <button
-              onClick={() => setExpanded(true)}
+              onClick={() => { track("Configure Form", { tool: form.toolname || form.formId }); setExpanded(true); }}
               className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
               title="Configure WebMCP attributes for this form"
             >
@@ -366,6 +368,7 @@ function FormCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              track("Highlight Form", { tool: form.toolname || form.formId });
               sendToSession({
                 type: "webmcp:highlight",
                 formIndex: form.index,
@@ -393,6 +396,7 @@ function FormCard({
                 if (showSchema) {
                   setShowSchema(false);
                 } else {
+                  track("View Schema", { tool: form.toolname || form.formId });
                   sendToSession({
                     type: "webmcp:get-schema",
                     formIndex: form.index,
@@ -410,7 +414,7 @@ function FormCard({
             </button>
             {hasPendingEdits && (
               <button
-                onClick={handleSave}
+                onClick={() => { track("Save Overrides", { tool: form.toolname || form.formId }); handleSave(); }}
                 className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 <Save className="w-3 h-3" /> Save

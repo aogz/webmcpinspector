@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
+import { track } from "./analytics";
 import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides, HistoryEntry } from "./types";
 
 const STORAGE_KEY = "webmcp-overrides";
@@ -108,6 +109,7 @@ export default function App() {
     const targetUrl = normalizeUrl(urlRef.current);
     if (!targetUrl) return;
     saveOverrideForUrl(targetUrl, override);
+    track("Tool Augmented", { tool: override.formId, url: targetUrl });
     addHistory("tool_augmented", `${override.formId} on ${targetUrl}`);
   }, [addHistory]);
 
@@ -150,6 +152,7 @@ export default function App() {
       // Trigger a rescan so the form list refreshes
       sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
     }
+    track("Tool Cleared", { tool: form.toolname || form.formId, url: normalizeUrl(urlRef.current) });
     addHistory("tool_cleared", `${form.toolname || form.formId} on ${normalizeUrl(urlRef.current)}`);
   }, [addHistory]);
 
@@ -219,6 +222,7 @@ export default function App() {
         sessionRef.current.closeTab(tab.ssid);
       }
       sessionRef.current.openTab(targetUrl);
+      track("Tab Opened", { url: targetUrl });
       addHistory("tab_opened", targetUrl);
 
       // Request a scan after the new tab loads
@@ -251,6 +255,7 @@ export default function App() {
         setForms([]);
         setImperativeTools([]);
         sessionRef.current = null;
+        track("Disconnected");
         addHistory("disconnected", "Session ended");
       });
 
@@ -295,6 +300,7 @@ export default function App() {
             const parts = [`${incomingForms.length} forms`, `${incomingImperative.length} imperative`];
             if (nativeMcp > 0) parts.push(`${nativeMcp} native MCP`);
             if (augmented > 0) parts.push(`${augmented} augmented`);
+            track("Tools Discovered", { forms: incomingForms.length, imperative: incomingImperative.length, url: urlRef.current });
             addHistory("tools_discovered", `${urlRef.current} — ${parts.join(", ")}`);
             break;
           }
@@ -319,9 +325,11 @@ export default function App() {
       // Mark connected immediately after start resolves
       setConnected(true);
       setConnecting(false);
+      track("Connected", { url: targetUrl });
       addHistory("connected", `Session started for ${targetUrl}`);
 
       await openTabPromise;
+      track("Tab Opened", { url: targetUrl });
       addHistory("tab_opened", targetUrl);
 
       // Request a scan from the content script after the tab loads
