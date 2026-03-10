@@ -51,7 +51,7 @@ export default function Sidebar({
   const webfuseCount = forms.filter((f) => f.webfuseApplied).length;
 
   return (
-    <aside className="w-[340px] min-w-[340px] border-r border-gray-200 flex flex-col bg-white">
+    <aside className="h-[40vh] md:h-auto w-full md:w-[340px] md:min-w-[340px] border-b md:border-b-0 md:border-r border-gray-200 flex flex-col bg-white overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
         <Settings className="w-5 h-5 text-gray-500" />
@@ -59,27 +59,37 @@ export default function Sidebar({
       </div>
 
       {/* URL + Connect */}
-      <div className="px-4 py-3 space-y-3 border-b border-gray-100">
+      <div className="px-4 py-2 md:py-3 space-y-2 md:space-y-3 border-b border-gray-100">
         <div className="relative">
           <label className="block text-xs font-medium text-gray-500 mb-1">
             URL
           </label>
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => onUrlChange(e.target.value)}
-            onFocus={() => urlHistory.length > 0 && setShowHistory(true)}
-            onBlur={() => setTimeout(() => setShowHistory(false), 150)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !connecting) {
-                setShowHistory(false);
-                onConnect();
-              }
-              if (e.key === "Escape") setShowHistory(false);
-            }}
-            placeholder="https://example.com"
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => onUrlChange(e.target.value)}
+              onFocus={() => urlHistory.length > 0 && setShowHistory(true)}
+              onBlur={() => setTimeout(() => setShowHistory(false), 150)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !connecting) {
+                  setShowHistory(false);
+                  onConnect();
+                }
+                if (e.key === "Escape") setShowHistory(false);
+              }}
+              placeholder="https://example.com"
+              className="flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <button
+              onClick={onConnect}
+              disabled={connecting}
+              className="md:hidden shrink-0 flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Play className="w-4 h-4" />
+              {connecting ? "..." : connected ? "Open" : "Go"}
+            </button>
+          </div>
           {showHistory && urlHistory.length > 0 && (
             <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
               {urlHistory
@@ -104,7 +114,7 @@ export default function Sidebar({
         <button
           onClick={onConnect}
           disabled={connecting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden md:flex w-full items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Play className="w-4 h-4" />
           {connecting ? "Connecting..." : connected ? "Open Tab" : "Connect"}
@@ -192,7 +202,7 @@ export default function Sidebar({
       </div>
 
       {/* Powered by Webfuse */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-center gap-2">
+      <div className="hidden md:flex px-4 py-3 border-t border-gray-100 items-center justify-center gap-2">
         <span className="text-sm text-gray-400">Powered by</span>
         <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
           <span className="text-base font-semibold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>

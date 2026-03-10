@@ -349,7 +349,7 @@ export default function App() {
   }, [url, connected, restoreOverrides]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white">
+    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-white">
       <Sidebar
         url={url}
         urlHistory={urlHistory}

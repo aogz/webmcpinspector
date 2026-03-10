@@ -31,7 +31,7 @@ function formatTime(ts: number): string {
 
 export default function MainContent({ connected, connecting, history }: MainContentProps) {
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+    <div className="h-[60vh] md:h-auto flex-1 flex flex-col min-w-0 bg-gray-50">
       <div className="flex-1 min-h-0 relative">
         <iframe
           id="webfuse-container"
@@ -56,7 +56,7 @@ export default function MainContent({ connected, connecting, history }: MainCont
         )}
       </div>
 
-      <div className="h-[200px] min-h-[200px] border-t border-gray-200 overflow-auto">
+      <div className="h-[100px] md:h-[200px] min-h-[100px] md:min-h-[200px] border-t border-gray-200 overflow-auto">
         <div className="p-4">
           <h3 className="text-base font-semibold text-gray-900 mb-2">
             History
