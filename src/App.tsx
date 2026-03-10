@@ -211,7 +211,11 @@ export default function App() {
   const handleConnect = useCallback(async () => {
     if (!url.trim()) return;
 
-    const targetUrl = url.trim();
+    let targetUrl = url.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = "https://" + targetUrl;
+      setUrl(targetUrl);
+    }
     addUrlToHistory(targetUrl);
     setUrlHistory(loadUrlHistory());
 
