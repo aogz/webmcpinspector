@@ -14,6 +14,8 @@ import {
   Code2,
   FileText,
   AlertTriangle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import PromptPanel from "./PromptPanel";
 import { track } from "../analytics";
@@ -43,6 +45,8 @@ interface SidebarProps {
   onExecuteTool: (toolName: string, args: Record<string, unknown>) => void;
   executionResults: Record<string, ToolExecutionResult>;
   executeToolAsync: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 export default function Sidebar({
@@ -61,6 +65,8 @@ export default function Sidebar({
   onExecuteTool,
   executionResults,
   executeToolAsync,
+  isOpen,
+  onToggle,
 }: SidebarProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -71,18 +77,42 @@ export default function Sidebar({
 
   const toolCount = nativeMcpForms.length + augmentedForms.length + imperativeTools.length;
 
+  // Collapsed sidebar (desktop only)
+  if (!isOpen) {
+    return (
+      <aside className="hidden md:flex w-12 min-w-12 border-r border-[#1e1e2e] flex-col items-center bg-[#0a0a0f] py-3 gap-3">
+        <button
+          onClick={onToggle}
+          className="p-2 text-[#6b6b80] hover:text-white transition-colors cursor-pointer"
+          title="Open sidebar"
+        >
+          <PanelLeftOpen className="w-5 h-5" />
+        </button>
+        <div className="w-6 h-px bg-[#1e1e2e]" />
+        <Settings className="w-4 h-4 text-[#6b6b80]" />
+      </aside>
+    );
+  }
+
   return (
-    <aside className="h-[40vh] md:h-auto w-full md:w-[340px] md:min-w-[340px] border-b md:border-b-0 md:border-r border-gray-200 flex flex-col bg-white overflow-hidden">
+    <aside className="h-[40vh] md:h-auto w-full md:w-[340px] md:min-w-[340px] border-b md:border-b-0 md:border-r border-[#1e1e2e] flex flex-col bg-[#0a0a0f] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-        <Settings className="w-5 h-5 text-gray-500" />
-        <h1 className="text-lg font-semibold text-gray-900">WebMCP Inspector</h1>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1e1e2e]">
+        <Settings className="w-5 h-5 text-[#9a9ab0]" />
+        <h1 className="text-lg font-semibold text-white flex-1">WebMCP Inspector</h1>
+        <button
+          onClick={onToggle}
+          className="hidden md:block p-1 text-[#6b6b80] hover:text-white transition-colors cursor-pointer"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
       </div>
 
       {/* URL + Connect */}
-      <div className="px-4 py-2 md:py-3 space-y-2 md:space-y-3 border-b border-gray-100">
+      <div className="px-4 py-2 md:py-3 space-y-2 md:space-y-3 border-b border-[#1e1e2e]">
         <div className="relative">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium text-[#9a9ab0] mb-1">
             URL
           </label>
           <div className="flex gap-2">
@@ -100,19 +130,19 @@ export default function Sidebar({
                 if (e.key === "Escape") setShowHistory(false);
               }}
               placeholder="https://example.com"
-              className="flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 min-w-0 px-3 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded-md text-sm text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]"
             />
             <button
               onClick={onConnect}
               disabled={connecting}
-              className="md:hidden shrink-0 flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="md:hidden shrink-0 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#2563eb] text-white rounded-md text-sm font-medium hover:bg-[#1d4ed8] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="w-4 h-4" />
               {connecting ? "..." : connected ? "Open" : "Go"}
             </button>
           </div>
           {showHistory && urlHistory.length > 0 && (
-            <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+            <div className="absolute z-10 left-0 right-0 mt-1 bg-[#12121a] border border-[#1e1e2e] rounded-md shadow-lg max-h-48 overflow-y-auto">
               {urlHistory
                 .filter((u) => u.toLowerCase().includes(url.toLowerCase()))
                 .map((historyUrl) => (
@@ -123,7 +153,7 @@ export default function Sidebar({
                       onUrlChange(historyUrl);
                       setShowHistory(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 truncate cursor-pointer"
+                    className="w-full text-left px-3 py-1.5 text-sm text-[#9a9ab0] hover:bg-[#1e1e2e] hover:text-[#60a5fa] truncate cursor-pointer"
                   >
                     {historyUrl}
                   </button>
@@ -135,7 +165,7 @@ export default function Sidebar({
         <button
           onClick={onConnect}
           disabled={connecting}
-          className="hidden md:flex w-full items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden md:flex w-full items-center justify-center gap-2 px-4 py-2 bg-[#2563eb] text-white rounded-md text-sm font-medium hover:bg-[#1d4ed8] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Play className="w-4 h-4" />
           {connecting ? "Connecting..." : connected ? "Open Tab" : "Connect"}
@@ -143,10 +173,10 @@ export default function Sidebar({
 
         <div className="flex items-center gap-2 justify-center">
           <span className={`w-2 h-2 rounded-full ${
-            connecting ? "bg-yellow-500 animate-pulse" : connected ? "bg-green-500" : "bg-gray-400"
+            connecting ? "bg-yellow-500 animate-pulse" : connected ? "bg-green-500" : "bg-[#6b6b80]"
           }`} />
           <span className={`text-xs ${
-            connecting ? "text-yellow-600" : connected ? "text-green-600" : "text-gray-400"
+            connecting ? "text-yellow-500" : connected ? "text-green-400" : "text-[#6b6b80]"
           }`}>
             {connecting ? "Connecting" : connected ? "Connected" : "Disconnected"}
           </span>
@@ -155,22 +185,22 @@ export default function Sidebar({
 
       {/* Stats bar + Rescan */}
       {connected && (
-        <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex gap-3 text-xs text-gray-500">
+        <div className="px-4 py-2 border-b border-[#1e1e2e] flex items-center justify-between">
+          <div className="flex gap-3 text-xs text-[#6b6b80]">
             <span>
-              <strong className="text-gray-700">{toolCount}</strong>{" "}
+              <strong className="text-[#e2e2e8]">{toolCount}</strong>{" "}
               {toolCount === 1 ? "tool" : "tools"}
             </span>
             {plainForms.length > 0 && (
               <span>
-                <strong className="text-gray-700">{plainForms.length}</strong>{" "}
+                <strong className="text-[#e2e2e8]">{plainForms.length}</strong>{" "}
                 {plainForms.length === 1 ? "form" : "forms"}
               </span>
             )}
           </div>
           <button
             onClick={() => { track("Rescan Page"); sendToSession({ type: "webmcp:scan" }); }}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#9a9ab0] bg-[#12121a] hover:bg-[#1e1e2e] hover:text-white rounded-md transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />
             Rescan
@@ -180,15 +210,15 @@ export default function Sidebar({
 
       {/* Scrollable tool/form list */}
       <div className="flex-1 overflow-y-auto">
-        {/* MCP Tools section */}
+        {/* WebMCP Tools section */}
         {(nativeMcpForms.length > 0 || augmentedForms.length > 0 || imperativeTools.length > 0) && (
           <div>
             <SectionHeader
               icon={<Zap className="w-3.5 h-3.5" />}
-              label="MCP Tools"
+              label="WebMCP Tools"
               count={toolCount}
-              color="text-green-700"
-              bgColor="bg-green-50"
+              color="text-green-400"
+              bgColor="bg-[#0d1a0f]"
             />
 
             {/* Native MCP form tools */}
@@ -196,7 +226,7 @@ export default function Sidebar({
               <FormCard
                 key={`native-${form.index}`}
                 form={form}
-                badge={{ label: "Native", color: "bg-green-100 text-green-700" }}
+                badge={{ label: "Native", color: "bg-[#1a3a2a] text-[#4ade80]" }}
                 sendToSession={sendToSession}
                 schemaResponse={schemaResponse}
                 onSaveOverrides={onSaveOverrides}
@@ -209,7 +239,7 @@ export default function Sidebar({
               <FormCard
                 key={`augmented-${form.index}`}
                 form={form}
-                badge={{ label: "Augmented", color: "bg-blue-100 text-blue-700" }}
+                badge={{ label: "Augmented", color: "bg-[#1e3a5f] text-[#60a5fa]" }}
                 sendToSession={sendToSession}
                 schemaResponse={schemaResponse}
                 onSaveOverrides={onSaveOverrides}
@@ -227,7 +257,7 @@ export default function Sidebar({
               />
             ))}
             {!supportsImperative && imperativeTools.length === 0 && (
-              <div className="mx-3 mb-2 flex items-start gap-1.5 text-[11px] text-amber-600 bg-amber-50 rounded-md px-2.5 py-2">
+              <div className="mx-3 mb-2 flex items-start gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 rounded-md px-2.5 py-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>Imperative tools require Chrome 146+.{chromeVersion !== null ? ` You have Chrome ${chromeVersion}.` : ""}</span>
               </div>
@@ -242,8 +272,8 @@ export default function Sidebar({
               icon={<FileText className="w-3.5 h-3.5" />}
               label="Detected Forms"
               count={plainForms.length}
-              color="text-gray-600"
-              bgColor="bg-gray-50"
+              color="text-[#9a9ab0]"
+              bgColor="bg-[#12121a]"
             />
             {plainForms.map((form) => (
               <FormCard
@@ -261,13 +291,13 @@ export default function Sidebar({
 
         {/* Empty states */}
         {forms.length === 0 && imperativeTools.length === 0 && (
-          <div className="p-4 text-sm text-gray-400 italic">
+          <div className="p-4 text-sm text-[#6b6b80] italic">
             {connected ? "No forms or tools detected on this page" : "Connect to a URL to discover tools"}
           </div>
         )}
       </div>
 
-      {/* Prompt API debug panel */}
+      {/* Prompt Debugger panel */}
       {connected && (
         <PromptPanel
           forms={forms}
@@ -277,10 +307,10 @@ export default function Sidebar({
       )}
 
       {/* Powered by Webfuse */}
-      <div className="hidden md:flex px-4 py-3 border-t border-gray-100 items-center justify-center gap-2">
-        <span className="text-sm text-gray-400">Powered by</span>
+      <div className="hidden md:flex px-4 py-3 border-t border-[#1e1e2e] items-center justify-center gap-2">
+        <span className="text-sm text-[#6b6b80]">Powered by</span>
         <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
-          <span className="text-base font-semibold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>
+          <span className="text-base font-semibold text-white" style={{ fontFamily: "'Manrope', sans-serif" }}>Webfuse</span>
           <img src="https://www.webfuse.com/logo.svg" alt="Webfuse" className="h-5" />
         </a>
       </div>
@@ -304,7 +334,7 @@ function SectionHeader({
   bgColor: string;
 }) {
   return (
-    <div className={`flex items-center gap-2 px-4 py-1.5 ${bgColor} border-b border-gray-100 sticky top-0 z-10`}>
+    <div className={`flex items-center gap-2 px-4 py-1.5 ${bgColor} border-b border-[#1e1e2e] sticky top-0 z-10`}>
       <span className={color}>{icon}</span>
       <span className={`text-xs font-semibold ${color} uppercase tracking-wide`}>
         {label}
@@ -438,11 +468,11 @@ function FormCard({
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#6b6b80] shrink-0" />
           ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <ChevronRight className="w-3.5 h-3.5 text-[#6b6b80] shrink-0" />
           )}
-          <span className="text-sm font-medium text-gray-800 truncate flex-1">
+          <span className="text-sm font-medium text-[#e2e2e8] truncate flex-1">
             {form.toolname || form.formId}
           </span>
         </button>
@@ -459,7 +489,7 @@ function FormCard({
                 track("Reset Form", { tool: form.toolname || form.formId });
                 onClearOverrides(form);
               }}
-              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-950/40 text-red-400 hover:bg-red-900/50 transition-colors cursor-pointer"
               title="Remove augmented attributes and restore original form"
             >
               <Undo2 className="w-3 h-3" /> Reset
@@ -468,7 +498,7 @@ function FormCard({
           {isPlainForm && (
             <button
               onClick={() => { track("Configure Form", { tool: form.toolname || form.formId }); setExpanded(true); }}
-              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
+              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-400 hover:bg-amber-900/50 transition-colors cursor-pointer"
               title="Add WebMCP attributes to expose this form as a tool"
             >
               <Wrench className="w-3 h-3" /> Make Tool
@@ -483,7 +513,7 @@ function FormCard({
                 formIndex: form.index,
               });
             }}
-            className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+            className="p-1 text-[#6b6b80] hover:text-[#60a5fa] transition-colors cursor-pointer"
             title="Locate form on page"
           >
             <Crosshair className="w-3.5 h-3.5" />
@@ -492,7 +522,7 @@ function FormCard({
       </div>
 
       {/* Subtitle */}
-      <div className="ml-5 text-[11px] text-gray-400">
+      <div className="ml-5 text-[11px] text-[#6b6b80]">
         {form.method} {form.action || "/"} &middot; {form.inputCount} fields
       </div>
 
@@ -515,8 +545,8 @@ function FormCard({
               }}
               className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-colors cursor-pointer ${
                 showSchema
-                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#1e3a5f] text-[#60a5fa] hover:bg-[#254a75]"
+                  : "bg-[#12121a] text-[#9a9ab0] hover:bg-[#1e1e2e]"
               }`}
             >
               <FileJson className="w-3 h-3" /> Schema
@@ -524,7 +554,7 @@ function FormCard({
             {hasPendingEdits && (
               <button
                 onClick={() => { track("Save Overrides", { tool: form.toolname || form.formId }); handleSave(); }}
-                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors cursor-pointer"
               >
                 <Save className="w-3 h-3" /> Save
               </button>
@@ -552,7 +582,7 @@ function FormCard({
           {/* Input fields */}
           {form.inputs.length > 0 && (
             <div className="mt-2">
-              <div className="text-[11px] font-medium text-gray-500 mb-1">
+              <div className="text-[11px] font-medium text-[#9a9ab0] mb-1">
                 Fields
               </div>
               <div className="space-y-2">
@@ -573,10 +603,10 @@ function FormCard({
           {/* Schema display */}
           {showSchema && schema && (
             <div className="mt-2">
-              <div className="text-[11px] font-medium text-gray-500 mb-1">
+              <div className="text-[11px] font-medium text-[#9a9ab0] mb-1">
                 Generated Schema
               </div>
-              <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
+              <pre className="text-[10px] bg-[#12121a] border border-[#1e1e2e] rounded p-2 overflow-x-auto max-h-48 overflow-y-auto text-[#e2e2e8]">
                 {JSON.stringify(schema, null, 2)}
               </pre>
             </div>
@@ -602,25 +632,25 @@ function InputCard({
   const displayName = input.name || input.id || input.label || `Field ${input.index}`;
 
   return (
-    <div className="border border-gray-100 rounded p-1.5">
+    <div className="border border-[#1e1e2e] rounded p-1.5">
       <button
         className="flex items-center gap-1 w-full text-left cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
-          <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+          <ChevronDown className="w-3 h-3 text-[#6b6b80] shrink-0" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
+          <ChevronRight className="w-3 h-3 text-[#6b6b80] shrink-0" />
         )}
-        <span className="text-[11px] font-medium text-gray-700 truncate flex-1">
+        <span className="text-[11px] font-medium text-[#e2e2e8] truncate flex-1">
           {displayName}
         </span>
-        <span className="text-[10px] text-gray-400 shrink-0">
+        <span className="text-[10px] text-[#6b6b80] shrink-0">
           {input.tag}
           {input.type !== input.tag ? `[${input.type}]` : ""}
         </span>
         {input.webfuseApplied && (
-          <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">
+          <span className="text-[10px] px-1 py-0.5 rounded bg-[#1e3a5f] text-[#60a5fa] shrink-0">
             Augmented
           </span>
         )}
@@ -637,7 +667,7 @@ function InputCard({
             value={getValue("toolparamdescription")}
             onChange={(v) => onChange("toolparamdescription", v)}
           />
-          <div className="text-[10px] text-gray-400">
+          <div className="text-[10px] text-[#6b6b80]">
             {input.required && <span className="text-red-400">required</span>}
             {input.label && <span> &middot; label: {input.label}</span>}
           </div>
@@ -704,34 +734,34 @@ function ImperativeCard({
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <ChevronDown className="w-3.5 h-3.5 text-[#6b6b80] shrink-0" />
         ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-[#6b6b80] shrink-0" />
         )}
-        <span className="text-sm font-medium text-gray-800 truncate flex-1">
+        <span className="text-sm font-medium text-[#e2e2e8] truncate flex-1">
           {tool.name}
         </span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium shrink-0">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#3b1f5e] text-[#a78bfa] font-medium shrink-0">
           <span className="inline-flex items-center gap-0.5">
             <Code2 className="w-3 h-3" /> Imperative
           </span>
         </span>
       </button>
       {tool.description && (
-        <div className="ml-5 text-[11px] text-gray-400 truncate">
+        <div className="ml-5 text-[11px] text-[#6b6b80] truncate">
           {tool.description}
         </div>
       )}
       {expanded && (
         <div className="mt-2 ml-5 space-y-2">
           {tool.description && (
-            <p className="text-xs text-gray-600">{tool.description}</p>
+            <p className="text-xs text-[#9a9ab0]">{tool.description}</p>
           )}
 
           {/* Parameter inputs */}
           {paramNames.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-[11px] font-medium text-gray-500">
+              <div className="text-[11px] font-medium text-[#9a9ab0]">
                 Parameters
               </div>
               {paramNames.map((paramName) => {
@@ -743,9 +773,9 @@ function ImperativeCard({
 
                 return (
                   <div key={paramName}>
-                    <label className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
+                    <label className="flex items-center gap-1 text-[10px] text-[#6b6b80] mb-0.5">
                       {paramName}
-                      <span className="text-gray-300">({propType})</span>
+                      <span className="text-[#4a4a5a]">({propType})</span>
                       {isRequired && <span className="text-red-400">*</span>}
                     </label>
                     {enumValues ? (
@@ -754,7 +784,7 @@ function ImperativeCard({
                         onChange={(e) =>
                           setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
                         }
-                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400 bg-white"
+                        className="w-full px-2 py-1 text-[11px] bg-[#12121a] border border-[#1e1e2e] rounded text-[#e2e2e8] focus:outline-none focus:ring-1 focus:ring-[#a78bfa] focus:border-[#a78bfa]"
                       >
                         <option value="">-- select --</option>
                         {enumValues.map((v) => (
@@ -767,7 +797,7 @@ function ImperativeCard({
                         onChange={(e) =>
                           setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
                         }
-                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400 bg-white"
+                        className="w-full px-2 py-1 text-[11px] bg-[#12121a] border border-[#1e1e2e] rounded text-[#e2e2e8] focus:outline-none focus:ring-1 focus:ring-[#a78bfa] focus:border-[#a78bfa]"
                       >
                         <option value="">-- select --</option>
                         <option value="true">true</option>
@@ -781,11 +811,11 @@ function ImperativeCard({
                           setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
                         }
                         placeholder={description || paramName}
-                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                        className="w-full px-2 py-1 text-[11px] bg-[#12121a] border border-[#1e1e2e] rounded text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-1 focus:ring-[#a78bfa] focus:border-[#a78bfa]"
                       />
                     )}
                     {description && (
-                      <div className="text-[10px] text-gray-400 mt-0.5">{description}</div>
+                      <div className="text-[10px] text-[#6b6b80] mt-0.5">{description}</div>
                     )}
                   </div>
                 );
@@ -798,7 +828,7 @@ function ImperativeCard({
             <button
               onClick={handleExecute}
               disabled={executionResult?.pending}
-              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-[#7c3aed] text-white hover:bg-[#6d28d9] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="w-3 h-3" />
               {executionResult?.pending ? "Running..." : "Execute"}
@@ -807,8 +837,8 @@ function ImperativeCard({
               onClick={() => setShowSchema(!showSchema)}
               className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-colors cursor-pointer ${
                 showSchema
-                  ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#3b1f5e] text-[#a78bfa] hover:bg-[#4c2a7a]"
+                  : "bg-[#12121a] text-[#9a9ab0] hover:bg-[#1e1e2e]"
               }`}
             >
               <FileJson className="w-3 h-3" /> Schema
@@ -819,14 +849,14 @@ function ImperativeCard({
           {executionResult && !executionResult.pending && (
             <div className="mt-1">
               <div className={`text-[11px] font-medium mb-0.5 ${
-                executionResult.error ? "text-red-600" : "text-green-600"
+                executionResult.error ? "text-red-400" : "text-green-400"
               }`}>
                 {executionResult.error ? "Error" : "Result"}
               </div>
               <pre className={`text-[10px] border rounded p-2 overflow-x-auto max-h-48 overflow-y-auto ${
                 executionResult.error
-                  ? "bg-red-50 border-red-200 text-red-700"
-                  : "bg-green-50 border-green-200 text-green-800"
+                  ? "bg-red-950/30 border-red-900/50 text-red-300"
+                  : "bg-green-950/30 border-green-900/50 text-green-300"
               }`}>
                 {executionResult.error
                   ? executionResult.error
@@ -838,10 +868,10 @@ function ImperativeCard({
           {/* Schema display */}
           {showSchema && (
             <div>
-              <div className="text-[11px] font-medium text-gray-500 mb-1">
+              <div className="text-[11px] font-medium text-[#9a9ab0] mb-1">
                 Input Schema
               </div>
-              <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
+              <pre className="text-[10px] bg-[#12121a] border border-[#1e1e2e] rounded p-2 overflow-x-auto max-h-48 overflow-y-auto text-[#e2e2e8]">
                 {JSON.stringify(tool.inputSchema, null, 2)}
               </pre>
             </div>
@@ -867,13 +897,13 @@ function AttrField({
 }) {
   return (
     <div>
-      <label className="block text-[10px] text-gray-400 mb-0.5">{label}</label>
+      <label className="block text-[10px] text-[#6b6b80] mb-0.5">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? label}
-        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+        className="w-full px-2 py-1 text-[11px] bg-[#12121a] border border-[#1e1e2e] rounded text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-1 focus:ring-[#60a5fa] focus:border-[#60a5fa]"
       />
     </div>
   );

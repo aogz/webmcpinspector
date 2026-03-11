@@ -92,6 +92,7 @@ export default function App() {
     null
   );
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [executionResults, setExecutionResults] = useState<Record<string, ToolExecutionResult>>({});
   const sessionRef = useRef<WebfuseSession | null>(null);
   const spaceRef = useRef<WebfuseSpace | null>(null);
@@ -424,7 +425,7 @@ export default function App() {
   }, [url, connected, restoreOverrides]);
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-white">
+    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#0a0a0f]">
       <Sidebar
         url={url}
         urlHistory={urlHistory}
@@ -441,6 +442,8 @@ export default function App() {
         onExecuteTool={handleExecuteTool}
         executionResults={executionResults}
         executeToolAsync={executeToolAsync}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
       <MainContent connected={connected} connecting={connecting} history={history} />
     </div>

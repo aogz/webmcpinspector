@@ -224,8 +224,8 @@ export default function PromptPanel({
 
   if (available === "checking") {
     return (
-      <div className="px-4 py-3 text-xs text-gray-400 flex items-center gap-1.5">
-        <Loader2 className="w-3 h-3 animate-spin" /> Checking Prompt API...
+      <div className="px-4 py-3 text-xs text-[#6b6b80] flex items-center gap-1.5">
+        <Loader2 className="w-3 h-3 animate-spin" /> Checking Prompt Debugger...
       </div>
     );
   }
@@ -233,13 +233,13 @@ export default function PromptPanel({
   if (available === "unavailable") {
     return (
       <div className="px-4 py-3 space-y-1.5">
-        <div className="flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-md px-3 py-2">
+        <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-950/40 rounded-md px-3 py-2">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <div>
             <div>Chrome Prompt API not available.</div>
-            <div className="mt-1 text-[10px] text-amber-500">Enable <code className="bg-amber-100 px-1 rounded">chrome://flags/#prompt-api-for-gemini-nano</code></div>
+            <div className="mt-1 text-[10px] text-amber-500/70">Enable <code className="bg-[#1e1e2e] px-1 rounded text-amber-400">chrome://flags/#prompt-api-for-gemini-nano</code></div>
             {debugInfo && (
-              <div className="mt-1 text-[10px] text-amber-400 font-mono">{debugInfo}</div>
+              <div className="mt-1 text-[10px] text-amber-500/50 font-mono">{debugInfo}</div>
             )}
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function PromptPanel({
   if (available === "downloadable" || available === "downloading") {
     return (
       <div className="px-4 py-3">
-        <div className="flex items-start gap-1.5 text-xs text-blue-600 bg-blue-50 rounded-md px-3 py-2">
+        <div className="flex items-start gap-1.5 text-xs text-[#60a5fa] bg-[#1e3a5f]/40 rounded-md px-3 py-2">
           {available === "downloading" ? (
             <>
               <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin mt-0.5" />
@@ -273,7 +273,7 @@ export default function PromptPanel({
                       setAvailable("unavailable");
                     }
                   }}
-                  className="mt-1.5 px-3 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
+                  className="mt-1.5 px-3 py-1 text-[11px] font-medium bg-[#2563eb] text-white rounded hover:bg-[#1d4ed8] transition-colors cursor-pointer"
                 >
                   Download Model
                 </button>
@@ -288,22 +288,22 @@ export default function PromptPanel({
   const toolCount = forms.filter((f) => f.toolname).length + imperativeTools.length;
 
   return (
-    <div className="flex flex-col border-t border-gray-200">
+    <div className="flex flex-col border-t border-[#1e1e2e]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-indigo-50 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[#12121a] border-b border-[#1e1e2e]">
         <div className="flex items-center gap-1.5">
-          <Bot className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
-            Prompt API
+          <Bot className="w-3.5 h-3.5 text-[#60a5fa]" />
+          <span className="text-xs font-semibold text-[#60a5fa] uppercase tracking-wide">
+            Prompt Debugger
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1e3a5f] text-[#60a5fa] font-medium">
             {toolCount} {toolCount === 1 ? "tool" : "tools"}
           </span>
         </div>
         {messages.length > 0 && (
           <button
             onClick={handleClear}
-            className="text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer flex items-center gap-0.5"
+            className="text-[10px] text-[#6b6b80] hover:text-[#9a9ab0] cursor-pointer flex items-center gap-0.5"
             title="Clear conversation"
           >
             <X className="w-3 h-3" /> Clear
@@ -318,7 +318,7 @@ export default function PromptPanel({
             <MessageBubble key={i} message={msg} />
           ))}
           {running && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-[#6b6b80]">
               <Loader2 className="w-3 h-3 animate-spin" /> Thinking...
             </div>
           )}
@@ -338,15 +338,15 @@ export default function PromptPanel({
                 handleSubmit();
               }
             }}
-            placeholder={toolCount > 0 ? "Ask Gemini to use the tools..." : "No tools available yet"}
+            placeholder={toolCount > 0 ? "Ask to do something on the page..." : "No tools available yet"}
             disabled={running}
             rows={2}
-            className="flex-1 min-w-0 px-2.5 py-1.5 text-[11px] border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 disabled:opacity-50"
+            className="flex-1 min-w-0 px-2.5 py-1.5 text-[11px] bg-[#12121a] border border-[#1e1e2e] rounded-md resize-none text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-1 focus:ring-[#60a5fa] focus:border-[#60a5fa] disabled:opacity-50"
           />
           <button
             onClick={handleSubmit}
             disabled={running || !input.trim()}
-            className="self-end shrink-0 p-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="self-end shrink-0 p-2 bg-[#2563eb] text-white rounded-md hover:bg-[#1d4ed8] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" />
           </button>
@@ -363,46 +363,46 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     case "user":
       return (
         <div className="flex items-start gap-1.5">
-          <User className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-gray-700">{message.content}</p>
+          <User className="w-3.5 h-3.5 text-[#6b6b80] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-[#e2e2e8]">{message.content}</p>
         </div>
       );
     case "assistant":
       return (
         <div className="flex items-start gap-1.5">
-          <Bot className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-gray-700 whitespace-pre-wrap">{message.content}</p>
+          <Bot className="w-3.5 h-3.5 text-[#60a5fa] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-[#e2e2e8] whitespace-pre-wrap">{message.content}</p>
         </div>
       );
     case "tool_call":
       return (
-        <div className="ml-5 flex items-start gap-1.5 bg-purple-50 rounded px-2 py-1.5">
-          <Wrench className="w-3 h-3 text-purple-500 shrink-0 mt-0.5" />
+        <div className="ml-5 flex items-start gap-1.5 bg-[#3b1f5e]/30 rounded px-2 py-1.5">
+          <Wrench className="w-3 h-3 text-[#a78bfa] shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <div className="text-[10px] font-medium text-purple-700">{message.toolName}</div>
-            <pre className="text-[10px] text-purple-600 overflow-x-auto">{message.content}</pre>
+            <div className="text-[10px] font-medium text-[#a78bfa]">{message.toolName}</div>
+            <pre className="text-[10px] text-[#a78bfa]/70 overflow-x-auto">{message.content}</pre>
           </div>
         </div>
       );
     case "tool_result":
       return (
-        <div className="ml-5 bg-green-50 border border-green-100 rounded px-2 py-1.5">
-          <div className="text-[10px] font-medium text-green-700 mb-0.5">
+        <div className="ml-5 bg-green-950/30 border border-green-900/50 rounded px-2 py-1.5">
+          <div className="text-[10px] font-medium text-green-400 mb-0.5">
             {message.toolName} result
           </div>
-          <pre className="text-[10px] text-green-800 overflow-x-auto max-h-24 overflow-y-auto">
+          <pre className="text-[10px] text-green-300 overflow-x-auto max-h-24 overflow-y-auto">
             {message.content}
           </pre>
         </div>
       );
     case "error":
       return (
-        <div className="ml-5 bg-red-50 border border-red-100 rounded px-2 py-1.5">
-          <div className="text-[10px] font-medium text-red-600 flex items-center gap-1">
+        <div className="ml-5 bg-red-950/30 border border-red-900/50 rounded px-2 py-1.5">
+          <div className="text-[10px] font-medium text-red-400 flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" />
             {message.toolName ? `${message.toolName} error` : "Error"}
           </div>
-          <pre className="text-[10px] text-red-700 overflow-x-auto">{message.content}</pre>
+          <pre className="text-[10px] text-red-300 overflow-x-auto">{message.content}</pre>
         </div>
       );
   }
