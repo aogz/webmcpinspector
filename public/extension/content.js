@@ -837,11 +837,11 @@ function handleMessage(session, event) {
 
 // ── Bootstrap ───────────────────────────────────────────────────────
 // ── Staging (webmcp-inspector-staging) ──
-var WIDGET_KEY = 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo';
-var SPACE_ID = '1872';
+// var WIDGET_KEY = 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo';
+// var SPACE_ID = '1872';
 // ── Production (webmcpinspector) ──
-// var WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ';
-// var SPACE_ID = '1798';
+var WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ';
+var SPACE_ID = '1798';
 
 (function waitForWebfuse() {
   if (typeof webfuse === 'undefined' || !webfuse.isInsideSession) {

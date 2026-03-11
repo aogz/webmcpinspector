@@ -14,6 +14,7 @@ import {
   Code2,
   FileText,
 } from "lucide-react";
+import PromptPanel from "./PromptPanel";
 import { track } from "../analytics";
 import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, ToolExecutionResult } from "../types";
 
@@ -32,6 +33,7 @@ interface SidebarProps {
   onClearOverrides: (form: FormTool) => void;
   onExecuteTool: (toolName: string, args: Record<string, unknown>) => void;
   executionResults: Record<string, ToolExecutionResult>;
+  executeToolAsync: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
 export default function Sidebar({
@@ -49,6 +51,7 @@ export default function Sidebar({
   onClearOverrides,
   onExecuteTool,
   executionResults,
+  executeToolAsync,
 }: SidebarProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -248,6 +251,15 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Prompt API debug panel */}
+      {connected && (
+        <PromptPanel
+          forms={forms}
+          imperativeTools={imperativeTools}
+          executeToolAsync={executeToolAsync}
+        />
+      )}
 
       {/* Powered by Webfuse */}
       <div className="hidden md:flex px-4 py-3 border-t border-gray-100 items-center justify-center gap-2">

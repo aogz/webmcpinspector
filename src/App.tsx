@@ -108,6 +108,29 @@ export default function App() {
     }
   }, []);
 
+  const pendingCallbacks = useRef<Record<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>>({});
+
+  const executeToolAsync = useCallback((toolName: string, args: Record<string, unknown>): Promise<unknown> => {
+    const requestId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    sendToSession({
+      type: "webmcp:execute-tool",
+      requestId,
+      toolName,
+      args,
+    });
+    track("Tool Executed", { tool: toolName });
+    addHistory("tool_executed", `Executed ${toolName}`);
+    return new Promise((resolve, reject) => {
+      pendingCallbacks.current[requestId] = { resolve, reject };
+      setTimeout(() => {
+        if (pendingCallbacks.current[requestId]) {
+          delete pendingCallbacks.current[requestId];
+          reject(new Error(`Tool execution timed out: ${toolName}`));
+        }
+      }, 30000);
+    });
+  }, [sendToSession, addHistory]);
+
   const handleSaveOverrides = useCallback((override: SavedFormOverride) => {
     const targetUrl = normalizeUrl(urlRef.current);
     if (!targetUrl) return;
@@ -335,16 +358,27 @@ export default function App() {
             break;
           case "webmcp:execute-tool-result": {
             const toolName = data.toolName as string;
+            const reqId = data.requestId as string;
             setExecutionResults((prev) => ({
               ...prev,
               [toolName]: {
-                requestId: data.requestId as string,
+                requestId: reqId,
                 toolName,
                 result: data.result,
                 error: data.error as string | undefined,
                 pending: false,
               },
             }));
+            // Resolve pending async callback
+            const cb = pendingCallbacks.current[reqId];
+            if (cb) {
+              delete pendingCallbacks.current[reqId];
+              if (data.error) {
+                cb.reject(new Error(data.error as string));
+              } else {
+                cb.resolve(data.result);
+              }
+            }
             if (data.error) {
               addHistory("tool_executed", `${toolName} failed: ${data.error}`);
             } else {
@@ -406,6 +440,7 @@ export default function App() {
         onClearOverrides={handleClearOverrides}
         onExecuteTool={handleExecuteTool}
         executionResults={executionResults}
+        executeToolAsync={executeToolAsync}
       />
       <MainContent connected={connected} connecting={connecting} history={history} />
     </div>

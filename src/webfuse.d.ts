@@ -39,11 +39,36 @@ interface Webfuse {
   on(eventName: string, callback: (...args: unknown[]) => void): Webfuse;
 }
 
+interface LanguageModelSession {
+  prompt(input: string, options?: { signal?: AbortSignal }): Promise<string>;
+  promptStreaming(input: string, options?: { signal?: AbortSignal }): ReadableStream<string>;
+  destroy(): void;
+}
+
+interface LanguageModelPrompt {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface LanguageModelCreateOptions {
+  initialPrompts?: LanguageModelPrompt[];
+  temperature?: number;
+  topK?: number;
+  expectedInputs?: Array<{ type: string; languages?: string[] }>;
+  expectedOutputs?: Array<{ type: string; languages?: string[] }>;
+}
+
+interface LanguageModelAPI {
+  availability(options?: LanguageModelCreateOptions): Promise<"available" | "downloadable" | "downloading" | "unavailable">;
+  create(options?: LanguageModelCreateOptions): Promise<LanguageModelSession>;
+}
+
 declare global {
   interface Window {
     webfuse: Webfuse;
   }
   const webfuse: Webfuse;
+  const LanguageModel: LanguageModelAPI;
 }
 
 export {};
