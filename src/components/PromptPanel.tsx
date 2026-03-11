@@ -59,6 +59,15 @@ ${toolList}
 When you use a tool, respond with EXACTLY this format:
 <tool_call>{"name": "tool_name", "args": {"param1": "value1"}}</tool_call>
 
+IMPORTANT: You must format argument values to match each parameter's expected type:
+- "string" parameters: pass as strings (e.g. "hello")
+- "number" or "integer" parameters: pass as numbers without quotes (e.g. 42, 3.14)
+- "boolean" parameters: pass as true or false without quotes
+- enum parameters (with a list of allowed values): use one of the listed values exactly
+- Use the exact parameter names defined in the tool schema
+- date/time parameters: convert natural language (e.g. "tomorrow", "next Friday", "3pm") to the expected format (ISO 8601, YYYY-MM-DD, HH:MM, etc.)
+- If the user provides data in a different format (e.g. "yes"/"no" for a boolean, "5" as text for a number, "March 5th" for a date), convert it to the correct type and format
+
 After a tool is executed, you will receive the result. You may then call another tool or briefly summarize the result.
 
 If you can identify the right tool but the user hasn't provided all the required information (e.g. their name, address, dates, preferences), ask them for the missing details before calling the tool. Be specific about what you need.
