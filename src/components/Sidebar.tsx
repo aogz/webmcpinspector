@@ -13,10 +13,19 @@ import {
   Zap,
   Code2,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import PromptPanel from "./PromptPanel";
 import { track } from "../analytics";
 import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, ToolExecutionResult } from "../types";
+
+function getChromeVersion(): number | null {
+  const match = navigator.userAgent.match(/Chrome\/(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+const chromeVersion = getChromeVersion();
+const supportsImperative = chromeVersion !== null && chromeVersion >= 146;
 
 interface SidebarProps {
   url: string;
@@ -217,6 +226,12 @@ export default function Sidebar({
                 executionResult={executionResults[tool.name] ?? null}
               />
             ))}
+            {!supportsImperative && imperativeTools.length === 0 && (
+              <div className="mx-3 mb-2 flex items-start gap-1.5 text-[11px] text-amber-600 bg-amber-50 rounded-md px-2.5 py-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>Imperative tools require Chrome 146+.{chromeVersion !== null ? ` You have Chrome ${chromeVersion}.` : ""}</span>
+              </div>
+            )}
           </div>
         )}
 
