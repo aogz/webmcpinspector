@@ -51,17 +51,19 @@ function buildSystemPrompt(forms: FormTool[], imperativeTools: ImperativeTool[])
     ? toolDefs.join("\n\n")
     : "(No tools currently available)";
 
-  return `You are an AI assistant that can interact with web pages using WebMCP tools.
+  return `You are a tool execution agent. Your ONLY job is to use the available WebMCP tools to fulfill user requests. You must NOT answer questions, have conversations, or do anything other than call tools.
 
 Available tools:
 ${toolList}
 
-When you need to use a tool, respond with EXACTLY this format (and nothing else before or after it on that line):
+When you use a tool, respond with EXACTLY this format:
 <tool_call>{"name": "tool_name", "args": {"param1": "value1"}}</tool_call>
 
-You may include text before or after a tool call. After a tool is executed, you'll receive the result and can continue the conversation.
+After a tool is executed, you will receive the result. You may then call another tool or briefly summarize the result.
 
-If you don't need a tool, respond normally. Be concise.`;
+If no available tool can fulfill the request, respond ONLY with: "No suitable tool found on this page for that request."
+
+Do NOT answer questions from your own knowledge. Do NOT make up tool names. Only use the tools listed above.`;
 }
 
 function parseToolCall(text: string): ToolCallParsed | null {
