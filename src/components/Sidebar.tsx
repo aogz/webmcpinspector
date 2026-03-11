@@ -10,10 +10,12 @@ import {
   Save,
   Wrench,
   Undo2,
+  Zap,
+  Code2,
+  FileText,
 } from "lucide-react";
-import TabBar from "./TabBar";
 import { track } from "../analytics";
-import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride } from "../types";
+import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, ToolExecutionResult } from "../types";
 
 interface SidebarProps {
   url: string;
@@ -28,6 +30,8 @@ interface SidebarProps {
   sendToSession: (msg: Record<string, unknown>) => void;
   onSaveOverrides: (override: SavedFormOverride) => void;
   onClearOverrides: (form: FormTool) => void;
+  onExecuteTool: (toolName: string, args: Record<string, unknown>) => void;
+  executionResults: Record<string, ToolExecutionResult>;
 }
 
 export default function Sidebar({
@@ -43,12 +47,17 @@ export default function Sidebar({
   sendToSession,
   onSaveOverrides,
   onClearOverrides,
+  onExecuteTool,
+  executionResults,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
-  const nativeCount = forms.filter((f) => f.hasWebMCP && !f.webfuseApplied).length;
-  const webfuseCount = forms.filter((f) => f.webfuseApplied).length;
+  // Categorize forms
+  const nativeMcpForms = forms.filter((f) => f.hasWebMCP && !f.webfuseApplied);
+  const augmentedForms = forms.filter((f) => f.webfuseApplied);
+  const plainForms = forms.filter((f) => !f.hasWebMCP && !f.webfuseApplied);
+
+  const toolCount = nativeMcpForms.length + augmentedForms.length + imperativeTools.length;
 
   return (
     <aside className="h-[40vh] md:h-auto w-full md:w-[340px] md:min-w-[340px] border-b md:border-b-0 md:border-r border-gray-200 flex flex-col bg-white overflow-hidden">
@@ -137,17 +146,14 @@ export default function Sidebar({
         <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
           <div className="flex gap-3 text-xs text-gray-500">
             <span>
-              <strong className="text-gray-700">{forms.length}</strong> forms
+              <strong className="text-gray-700">{toolCount}</strong>{" "}
+              {toolCount === 1 ? "tool" : "tools"}
             </span>
-            <span>
-              <strong className="text-gray-700">{imperativeTools.length}</strong>{" "}
-              imperative
-            </span>
-            {nativeCount > 0 && (
-              <span className="text-green-600">{nativeCount} native</span>
-            )}
-            {webfuseCount > 0 && (
-              <span className="text-blue-600">{webfuseCount} augmented</span>
+            {plainForms.length > 0 && (
+              <span>
+                <strong className="text-gray-700">{plainForms.length}</strong>{" "}
+                {plainForms.length === 1 ? "form" : "forms"}
+              </span>
             )}
           </div>
           <button
@@ -155,48 +161,90 @@ export default function Sidebar({
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 rounded-md transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />
-            Rescan page
+            Rescan
           </button>
         </div>
       )}
 
-      {/* Tab bar */}
-      <TabBar
-        tabs={["Declarative Tools", "Imperative Tools"]}
-        activeTab={activeTab}
-        onTabChange={(tab) => { track("Tab Switch", { tab: tab === 0 ? "declarative" : "imperative" }); setActiveTab(tab); }}
-      />
-
-      {/* Tool cards */}
+      {/* Scrollable tool/form list */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 0 ? (
-          forms.length === 0 ? (
-            <div className="p-4 text-sm text-gray-400 italic">
-              {connected ? "No forms detected" : "No declarative tools"}
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {forms.map((form) => (
-                <FormCard
-                  key={form.index}
-                  form={form}
-                  sendToSession={sendToSession}
-                  schemaResponse={schemaResponse}
-                  onSaveOverrides={onSaveOverrides}
-                  onClearOverrides={onClearOverrides}
-                />
-              ))}
-            </div>
-          )
-        ) : imperativeTools.length === 0 ? (
-          <div className="p-4 text-sm text-gray-400 italic">
-            {connected ? "No imperative tools detected" : "No imperative tools"}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {imperativeTools.map((tool) => (
-              <ImperativeCard key={tool.name} tool={tool} />
+        {/* MCP Tools section */}
+        {(nativeMcpForms.length > 0 || augmentedForms.length > 0 || imperativeTools.length > 0) && (
+          <div>
+            <SectionHeader
+              icon={<Zap className="w-3.5 h-3.5" />}
+              label="MCP Tools"
+              count={toolCount}
+              color="text-green-700"
+              bgColor="bg-green-50"
+            />
+
+            {/* Native MCP form tools */}
+            {nativeMcpForms.map((form) => (
+              <FormCard
+                key={`native-${form.index}`}
+                form={form}
+                badge={{ label: "Native", color: "bg-green-100 text-green-700" }}
+                sendToSession={sendToSession}
+                schemaResponse={schemaResponse}
+                onSaveOverrides={onSaveOverrides}
+                onClearOverrides={onClearOverrides}
+              />
             ))}
+
+            {/* Augmented form tools */}
+            {augmentedForms.map((form) => (
+              <FormCard
+                key={`augmented-${form.index}`}
+                form={form}
+                badge={{ label: "Augmented", color: "bg-blue-100 text-blue-700" }}
+                sendToSession={sendToSession}
+                schemaResponse={schemaResponse}
+                onSaveOverrides={onSaveOverrides}
+                onClearOverrides={onClearOverrides}
+              />
+            ))}
+
+            {/* Imperative tools */}
+            {imperativeTools.map((tool) => (
+              <ImperativeCard
+                key={tool.name}
+                tool={tool}
+                onExecute={onExecuteTool}
+                executionResult={executionResults[tool.name] ?? null}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Detected Forms section (not yet tools) */}
+        {plainForms.length > 0 && (
+          <div>
+            <SectionHeader
+              icon={<FileText className="w-3.5 h-3.5" />}
+              label="Detected Forms"
+              count={plainForms.length}
+              color="text-gray-600"
+              bgColor="bg-gray-50"
+            />
+            {plainForms.map((form) => (
+              <FormCard
+                key={`plain-${form.index}`}
+                form={form}
+                badge={null}
+                sendToSession={sendToSession}
+                schemaResponse={schemaResponse}
+                onSaveOverrides={onSaveOverrides}
+                onClearOverrides={onClearOverrides}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty states */}
+        {forms.length === 0 && imperativeTools.length === 0 && (
+          <div className="p-4 text-sm text-gray-400 italic">
+            {connected ? "No forms or tools detected on this page" : "Connect to a URL to discover tools"}
           </div>
         )}
       </div>
@@ -213,16 +261,46 @@ export default function Sidebar({
   );
 }
 
+// ── Section Header ──────────────────────────────────────────────────
+
+function SectionHeader({
+  icon,
+  label,
+  count,
+  color,
+  bgColor,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  color: string;
+  bgColor: string;
+}) {
+  return (
+    <div className={`flex items-center gap-2 px-4 py-1.5 ${bgColor} border-b border-gray-100 sticky top-0 z-10`}>
+      <span className={color}>{icon}</span>
+      <span className={`text-xs font-semibold ${color} uppercase tracking-wide`}>
+        {label}
+      </span>
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${bgColor} ${color} font-medium`}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
 // ── Form Card ───────────────────────────────────────────────────────
 
 function FormCard({
   form,
+  badge,
   sendToSession,
   schemaResponse,
   onSaveOverrides,
   onClearOverrides,
 }: {
   form: FormTool;
+  badge: { label: string; color: string } | null;
   sendToSession: (msg: Record<string, unknown>) => void;
   schemaResponse: SchemaResponse | null;
   onSaveOverrides: (override: SavedFormOverride) => void;
@@ -253,7 +331,6 @@ function FormCard({
     }));
 
   const handleSave = () => {
-    // Send form-level attribute changes
     for (const [attrName, attrValue] of Object.entries(edits)) {
       sendToSession({
         type: "webmcp:set-form-attr",
@@ -263,7 +340,6 @@ function FormCard({
         isWebfuseApplied: true,
       });
     }
-    // Send input-level attribute changes
     for (const [inputIdx, attrs] of Object.entries(inputEdits)) {
       for (const [attrName, attrValue] of Object.entries(attrs)) {
         sendToSession({
@@ -276,7 +352,6 @@ function FormCard({
         });
       }
     }
-    // Build merged override snapshot and persist
     const mergedAttrs: Record<string, string> = {};
     for (const key of ["toolname", "tooldescription", "toolautosubmit"] as const) {
       const val = edits[key] ?? (form as unknown as Record<string, string>)[key] ?? "";
@@ -325,6 +400,8 @@ function FormCard({
   const schema =
     schemaResponse?.formIndex === form.index ? schemaResponse.schema : null;
 
+  const isPlainForm = !form.hasWebMCP && !form.webfuseApplied;
+
   return (
     <div className="px-3 py-2">
       {/* Card header row */}
@@ -343,36 +420,31 @@ function FormCard({
           </span>
         </button>
         <span className="flex items-center gap-1 shrink-0">
-          {form.hasWebMCP && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-              MCP
+          {badge && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badge.color}`}>
+              {badge.label}
             </span>
           )}
           {form.webfuseApplied && (
-            <>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                WF
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  track("Reset Form", { tool: form.toolname || form.formId });
-                  onClearOverrides(form);
-                }}
-                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                title="Remove augmented attributes and restore original"
-              >
-                <Undo2 className="w-3 h-3" /> Reset
-              </button>
-            </>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                track("Reset Form", { tool: form.toolname || form.formId });
+                onClearOverrides(form);
+              }}
+              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+              title="Remove augmented attributes and restore original form"
+            >
+              <Undo2 className="w-3 h-3" /> Reset
+            </button>
           )}
-          {!form.hasWebMCP && !form.webfuseApplied && (
+          {isPlainForm && (
             <button
               onClick={() => { track("Configure Form", { tool: form.toolname || form.formId }); setExpanded(true); }}
               className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
-              title="Configure WebMCP attributes for this form"
+              title="Add WebMCP attributes to expose this form as a tool"
             >
-              <Wrench className="w-3 h-3" /> Configure
+              <Wrench className="w-3 h-3" /> Make Tool
             </button>
           )}
           <button
@@ -522,7 +594,7 @@ function InputCard({
         </span>
         {input.webfuseApplied && (
           <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">
-            WF
+            Augmented
           </span>
         )}
       </button>
@@ -550,8 +622,53 @@ function InputCard({
 
 // ── Imperative Tool Card ────────────────────────────────────────────
 
-function ImperativeCard({ tool }: { tool: ImperativeTool }) {
+function getSchemaProperties(
+  inputSchema: Record<string, unknown>
+): Record<string, Record<string, unknown>> {
+  const props = inputSchema?.properties;
+  if (props && typeof props === "object") return props as Record<string, Record<string, unknown>>;
+  return {};
+}
+
+function getSchemaRequired(inputSchema: Record<string, unknown>): string[] {
+  const req = inputSchema?.required;
+  if (Array.isArray(req)) return req as string[];
+  return [];
+}
+
+function ImperativeCard({
+  tool,
+  onExecute,
+  executionResult,
+}: {
+  tool: ImperativeTool;
+  onExecute: (toolName: string, args: Record<string, unknown>) => void;
+  executionResult: ToolExecutionResult | null;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [showSchema, setShowSchema] = useState(false);
+  const [argValues, setArgValues] = useState<Record<string, string>>({});
+
+  const properties = getSchemaProperties(tool.inputSchema);
+  const requiredFields = getSchemaRequired(tool.inputSchema);
+  const paramNames = Object.keys(properties);
+
+  const handleExecute = () => {
+    const args: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(argValues)) {
+      if (!val) continue;
+      const prop = properties[key];
+      const propType = prop?.type;
+      if (propType === "number" || propType === "integer") {
+        args[key] = Number(val);
+      } else if (propType === "boolean") {
+        args[key] = val === "true";
+      } else {
+        args[key] = val;
+      }
+    }
+    onExecute(tool.name, args);
+  };
 
   return (
     <div className="px-3 py-2">
@@ -567,8 +684,10 @@ function ImperativeCard({ tool }: { tool: ImperativeTool }) {
         <span className="text-sm font-medium text-gray-800 truncate flex-1">
           {tool.name}
         </span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">
-          JS
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium shrink-0">
+          <span className="inline-flex items-center gap-0.5">
+            <Code2 className="w-3 h-3" /> Imperative
+          </span>
         </span>
       </button>
       {tool.description && (
@@ -577,16 +696,129 @@ function ImperativeCard({ tool }: { tool: ImperativeTool }) {
         </div>
       )}
       {expanded && (
-        <div className="mt-2 ml-5">
+        <div className="mt-2 ml-5 space-y-2">
           {tool.description && (
-            <p className="text-xs text-gray-600 mb-2">{tool.description}</p>
+            <p className="text-xs text-gray-600">{tool.description}</p>
           )}
-          <div className="text-[11px] font-medium text-gray-500 mb-1">
-            Input Schema
+
+          {/* Parameter inputs */}
+          {paramNames.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-medium text-gray-500">
+                Parameters
+              </div>
+              {paramNames.map((paramName) => {
+                const prop = properties[paramName];
+                const isRequired = requiredFields.includes(paramName);
+                const propType = (prop?.type as string) || "string";
+                const description = prop?.description as string | undefined;
+                const enumValues = prop?.enum as string[] | undefined;
+
+                return (
+                  <div key={paramName}>
+                    <label className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
+                      {paramName}
+                      <span className="text-gray-300">({propType})</span>
+                      {isRequired && <span className="text-red-400">*</span>}
+                    </label>
+                    {enumValues ? (
+                      <select
+                        value={argValues[paramName] ?? ""}
+                        onChange={(e) =>
+                          setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
+                        }
+                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400 bg-white"
+                      >
+                        <option value="">-- select --</option>
+                        {enumValues.map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    ) : propType === "boolean" ? (
+                      <select
+                        value={argValues[paramName] ?? ""}
+                        onChange={(e) =>
+                          setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
+                        }
+                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400 bg-white"
+                      >
+                        <option value="">-- select --</option>
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                      </select>
+                    ) : (
+                      <input
+                        type={propType === "number" || propType === "integer" ? "number" : "text"}
+                        value={argValues[paramName] ?? ""}
+                        onChange={(e) =>
+                          setArgValues((prev) => ({ ...prev, [paramName]: e.target.value }))
+                        }
+                        placeholder={description || paramName}
+                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                      />
+                    )}
+                    {description && (
+                      <div className="text-[10px] text-gray-400 mt-0.5">{description}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Execute button */}
+          <div className="flex gap-1.5">
+            <button
+              onClick={handleExecute}
+              disabled={executionResult?.pending}
+              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Play className="w-3 h-3" />
+              {executionResult?.pending ? "Running..." : "Execute"}
+            </button>
+            <button
+              onClick={() => setShowSchema(!showSchema)}
+              className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-colors cursor-pointer ${
+                showSchema
+                  ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <FileJson className="w-3 h-3" /> Schema
+            </button>
           </div>
-          <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(tool.inputSchema, null, 2)}
-          </pre>
+
+          {/* Execution result */}
+          {executionResult && !executionResult.pending && (
+            <div className="mt-1">
+              <div className={`text-[11px] font-medium mb-0.5 ${
+                executionResult.error ? "text-red-600" : "text-green-600"
+              }`}>
+                {executionResult.error ? "Error" : "Result"}
+              </div>
+              <pre className={`text-[10px] border rounded p-2 overflow-x-auto max-h-48 overflow-y-auto ${
+                executionResult.error
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-green-50 border-green-200 text-green-800"
+              }`}>
+                {executionResult.error
+                  ? executionResult.error
+                  : JSON.stringify(executionResult.result, null, 2) ?? "undefined"}
+              </pre>
+            </div>
+          )}
+
+          {/* Schema display */}
+          {showSchema && (
+            <div>
+              <div className="text-[11px] font-medium text-gray-500 mb-1">
+                Input Schema
+              </div>
+              <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto">
+                {JSON.stringify(tool.inputSchema, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

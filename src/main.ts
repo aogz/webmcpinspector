@@ -4,8 +4,10 @@ declare const webfuse: any
 
 const STORAGE_KEY = 'webmcp-overrides'
 const URL_STORAGE_KEY = 'webmcp-last-url'
-const WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ'
-const SPACE_ID = '1798'
+const WIDGET_KEY = import.meta.env.DEV
+  ? 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo'
+  : 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ'
+const SPACE_ID = import.meta.env.DEV ? '1872' : '1798'
 
 // ── Types ────────────────────────────────────────────────────────────
 

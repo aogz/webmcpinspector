@@ -8,6 +8,7 @@ let savedOutline = '';
 let savedBoxShadow = '';
 let savedTransition = '';
 let imperativeTools = [];
+let imperativeToolHandlers = {}; // name → full tool object (with handler)
 let isAnimating = false;
 
 // ── Imperative API Watcher ──────────────────────────────────────────
@@ -19,10 +20,217 @@ if (typeof navigator !== 'undefined' && 'modelContext' in navigator) {
       description: tool.description,
       inputSchema: tool.inputSchema,
     });
+    imperativeToolHandlers[tool.name] = tool;
     sendToolsUpdate();
     return originalRegisterTool.apply(this, arguments);
   };
 }
+
+// ── navigator.modelContextTesting API ───────────────────────────────
+(function () {
+  function buildFormToolSchema(form, formIndex) {
+    var toolname = form.getAttribute('toolname') || '';
+    var tooldescription = form.getAttribute('tooldescription') || '';
+    if (!toolname) return null;
+
+    var properties = {};
+    var required = [];
+    var fields = form.querySelectorAll(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
+    );
+
+    fields.forEach(function (field) {
+      var name =
+        field.getAttribute('toolparamtitle') ||
+        field.getAttribute('name') ||
+        field.id ||
+        'field_' + Math.random().toString(36).slice(2, 6);
+      var description =
+        field.getAttribute('toolparamdescription') ||
+        getLabelForField(field) ||
+        name;
+      var type = field.getAttribute('type') || 'text';
+
+      var prop = { type: 'string', description: description };
+
+      if (type === 'number' || type === 'range') {
+        prop.type = 'number';
+        if (field.min) prop.minimum = Number(field.min);
+        if (field.max) prop.maximum = Number(field.max);
+      } else if (type === 'checkbox') {
+        prop.type = 'boolean';
+      } else if (field.tagName === 'SELECT') {
+        var options = [];
+        field.querySelectorAll('option').forEach(function (opt) {
+          if (opt.value) options.push(opt.value);
+        });
+        if (options.length) prop.enum = options;
+      }
+
+      if (field.placeholder) prop.examples = [field.placeholder];
+
+      properties[name] = prop;
+      if (field.required) required.push(name);
+    });
+
+    return {
+      name: toolname,
+      description: tooldescription,
+      inputSchema: {
+        type: 'object',
+        properties: properties,
+        required: required.length ? required : undefined,
+      },
+      _type: 'form',
+      _formIndex: formIndex,
+    };
+  }
+
+  function listTools() {
+    var tools = [];
+
+    // Collect form-based (declarative) tools
+    var forms = document.querySelectorAll('form');
+    forms.forEach(function (form, index) {
+      var schema = buildFormToolSchema(form, index);
+      if (schema) {
+        tools.push({
+          name: schema.name,
+          description: schema.description,
+          inputSchema: schema.inputSchema,
+          type: 'form',
+        });
+      }
+    });
+
+    // Collect imperative tools
+    imperativeTools.forEach(function (tool) {
+      tools.push({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        type: 'imperative',
+      });
+    });
+
+    return tools;
+  }
+
+  function executeFormTool(toolname, args) {
+    var forms = document.querySelectorAll('form');
+    var targetForm = null;
+
+    for (var i = 0; i < forms.length; i++) {
+      if (forms[i].getAttribute('toolname') === toolname) {
+        targetForm = forms[i];
+        break;
+      }
+    }
+
+    if (!targetForm) {
+      return Promise.reject(new Error('Form tool "' + toolname + '" not found'));
+    }
+
+    var fields = targetForm.querySelectorAll(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
+    );
+
+    // Map args to fields by toolparamtitle, name, or id
+    if (args && typeof args === 'object') {
+      fields.forEach(function (field) {
+        var paramKey =
+          field.getAttribute('toolparamtitle') ||
+          field.getAttribute('name') ||
+          field.id;
+        if (!paramKey || !(paramKey in args)) return;
+
+        var value = args[paramKey];
+        var type = field.getAttribute('type') || 'text';
+
+        if (type === 'checkbox') {
+          field.checked = !!value;
+        } else if (field.tagName === 'SELECT') {
+          field.value = String(value);
+        } else {
+          field.value = String(value);
+        }
+
+        // Dispatch events so frameworks pick up the change
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+
+    // Submit the form
+    var autosubmit = targetForm.getAttribute('toolautosubmit');
+    if (autosubmit === 'false') {
+      return Promise.resolve({ submitted: false, message: 'Fields filled, auto-submit disabled' });
+    }
+
+    // Try clicking a submit button first, then fall back to form.submit()
+    var submitBtn = targetForm.querySelector(
+      'button[type="submit"], input[type="submit"], button:not([type])'
+    );
+    if (submitBtn) {
+      submitBtn.click();
+    } else {
+      targetForm.submit();
+    }
+
+    return Promise.resolve({ submitted: true });
+  }
+
+  function executeTool(name, args) {
+    if (!name || typeof name !== 'string') {
+      return Promise.reject(new Error('Tool name is required'));
+    }
+
+    // Check imperative tools first
+    var handler = imperativeToolHandlers[name];
+    if (handler) {
+      try {
+        var result = typeof handler.handler === 'function'
+          ? handler.handler(args || {})
+          : typeof handler.execute === 'function'
+            ? handler.execute(args || {})
+            : typeof handler.callback === 'function'
+              ? handler.callback(args || {})
+              : undefined;
+        return Promise.resolve(result);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+
+    // Check form-based tools
+    return executeFormTool(name, args);
+  }
+
+  // Expose on navigator.modelContextTesting
+  if (typeof navigator !== 'undefined') {
+    try {
+      Object.defineProperty(navigator, 'modelContextTesting', {
+        value: Object.freeze({
+          listTools: listTools,
+          executeTool: executeTool,
+        }),
+        writable: false,
+        enumerable: true,
+        configurable: true,
+      });
+    } catch (e) {
+      // Fallback: simple assignment if defineProperty is restricted
+      try {
+        navigator.modelContextTesting = Object.freeze({
+          listTools: listTools,
+          executeTool: executeTool,
+        });
+      } catch (e2) {
+        console.warn('[WebMCP content.js] Could not define navigator.modelContextTesting:', e2);
+      }
+    }
+  }
+})();
 
 // ── Scan Animation ──────────────────────────────────────────────────
 function showScanAnimation() {
@@ -586,12 +794,54 @@ function handleMessage(session, event) {
         console.warn('[WebMCP content.js] Failed to send schema:', e);
       }
       break;
+
+    case 'webmcp:list-tools':
+      try {
+        var tools = navigator.modelContextTesting.listTools();
+        webfuse.currentSession.sendMessage({
+          type: 'webmcp:list-tools-result',
+          requestId: data.requestId,
+          tools: tools,
+        }, '*');
+      } catch (e) {
+        console.warn('[WebMCP content.js] Failed to list tools:', e);
+        webfuse.currentSession.sendMessage({
+          type: 'webmcp:list-tools-result',
+          requestId: data.requestId,
+          error: e.message,
+        }, '*');
+      }
+      break;
+
+    case 'webmcp:execute-tool':
+      navigator.modelContextTesting.executeTool(data.toolName, data.args)
+        .then(function (result) {
+          webfuse.currentSession.sendMessage({
+            type: 'webmcp:execute-tool-result',
+            requestId: data.requestId,
+            toolName: data.toolName,
+            result: result,
+          }, '*');
+        })
+        .catch(function (err) {
+          webfuse.currentSession.sendMessage({
+            type: 'webmcp:execute-tool-result',
+            requestId: data.requestId,
+            toolName: data.toolName,
+            error: err.message,
+          }, '*');
+        });
+      break;
   }
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────────
-var WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ';
-var SPACE_ID = '1798';
+// ── Staging (webmcp-inspector-staging) ──
+var WIDGET_KEY = 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo';
+var SPACE_ID = '1872';
+// ── Production (webmcpinspector) ──
+// var WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ';
+// var SPACE_ID = '1798';
 
 (function waitForWebfuse() {
   if (typeof webfuse === 'undefined' || !webfuse.isInsideSession) {

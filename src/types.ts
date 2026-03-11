@@ -41,9 +41,17 @@ export interface SavedPageOverrides {
   [url: string]: SavedFormOverride[];
 }
 
+export interface ToolExecutionResult {
+  requestId: string;
+  toolName: string;
+  result?: unknown;
+  error?: string;
+  pending?: boolean;
+}
+
 export interface HistoryEntry {
   timestamp: number;
-  type: "connected" | "disconnected" | "tools_discovered" | "tool_augmented" | "tool_cleared" | "tab_opened";
+  type: "connected" | "disconnected" | "tools_discovered" | "tool_augmented" | "tool_cleared" | "tab_opened" | "tool_executed";
   message: string;
 }
 

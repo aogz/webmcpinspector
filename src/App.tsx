@@ -2,13 +2,15 @@ import { useState, useRef, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
 import { track } from "./analytics";
-import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides, HistoryEntry } from "./types";
+import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides, HistoryEntry, ToolExecutionResult } from "./types";
 
 const STORAGE_KEY = "webmcp-overrides";
 const URL_STORAGE_KEY = "webmcp-last-url";
 const URL_HISTORY_KEY = "webmcp-url-history";
-const WIDGET_KEY = "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
-const SPACE_ID = "1798";
+const WIDGET_KEY = import.meta.env.DEV
+  ? "wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo"
+  : "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
+const SPACE_ID = import.meta.env.DEV ? "1872" : "1798";
 
 function normalizeUrl(raw: string): string {
   let u = raw.trim();
@@ -90,6 +92,7 @@ export default function App() {
     null
   );
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [executionResults, setExecutionResults] = useState<Record<string, ToolExecutionResult>>({});
   const sessionRef = useRef<WebfuseSession | null>(null);
   const spaceRef = useRef<WebfuseSpace | null>(null);
   const urlRef = useRef(url);
@@ -156,6 +159,22 @@ export default function App() {
     addHistory("tool_cleared", `${form.toolname || form.formId} on ${normalizeUrl(urlRef.current)}`);
   }, [addHistory]);
 
+  const handleExecuteTool = useCallback((toolName: string, args: Record<string, unknown>) => {
+    const requestId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setExecutionResults((prev) => ({
+      ...prev,
+      [toolName]: { requestId, toolName, pending: true },
+    }));
+    sendToSession({
+      type: "webmcp:execute-tool",
+      requestId,
+      toolName,
+      args,
+    });
+    track("Tool Executed", { tool: toolName });
+    addHistory("tool_executed", `Executed ${toolName}`);
+  }, [sendToSession, addHistory]);
+
   const restoreOverrides = useCallback((incomingForms: FormTool[]) => {
     const targetUrl = normalizeUrl(urlRef.current);
     if (!targetUrl) return;
@@ -221,6 +240,9 @@ export default function App() {
 
     // If we already have a running session, close existing tabs then open new one
     if (connected && sessionRef.current) {
+      setForms([]);
+      setImperativeTools([]);
+      setSchemaResponse(null);
       const tabs = await sessionRef.current.getTabs();
       for (const tab of tabs) {
         sessionRef.current.closeTab(tab.ssid);
@@ -311,6 +333,25 @@ export default function App() {
           case "webmcp:schema":
             setSchemaResponse(data as unknown as SchemaResponse);
             break;
+          case "webmcp:execute-tool-result": {
+            const toolName = data.toolName as string;
+            setExecutionResults((prev) => ({
+              ...prev,
+              [toolName]: {
+                requestId: data.requestId as string,
+                toolName,
+                result: data.result,
+                error: data.error as string | undefined,
+                pending: false,
+              },
+            }));
+            if (data.error) {
+              addHistory("tool_executed", `${toolName} failed: ${data.error}`);
+            } else {
+              addHistory("tool_executed", `${toolName} completed`);
+            }
+            break;
+          }
         }
       });
 
@@ -363,6 +404,8 @@ export default function App() {
         sendToSession={sendToSession}
         onSaveOverrides={handleSaveOverrides}
         onClearOverrides={handleClearOverrides}
+        onExecuteTool={handleExecuteTool}
+        executionResults={executionResults}
       />
       <MainContent connected={connected} connecting={connecting} history={history} />
     </div>
