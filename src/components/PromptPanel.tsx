@@ -61,6 +61,8 @@ When you use a tool, respond with EXACTLY this format:
 
 After a tool is executed, you will receive the result. You may then call another tool or briefly summarize the result.
 
+If you can identify the right tool but the user hasn't provided all the required information (e.g. their name, address, dates, preferences), ask them for the missing details before calling the tool. Be specific about what you need.
+
 If no available tool can fulfill the request, respond ONLY with: "No suitable tool found on this page for that request."
 
 Do NOT answer questions from your own knowledge. Do NOT make up tool names. Only use the tools listed above.`;
