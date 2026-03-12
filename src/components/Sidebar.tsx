@@ -256,12 +256,14 @@ export default function Sidebar({
                 executionResult={executionResults[tool.name] ?? null}
               />
             ))}
-            {!supportsImperative && imperativeTools.length === 0 && (
-              <div className="mx-3 mb-2 flex items-start gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 rounded-md px-2.5 py-2">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>Imperative tools require Chrome 146+.{chromeVersion !== null ? ` You have Chrome ${chromeVersion}.` : ""}</span>
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Imperative API warning */}
+        {!supportsImperative && (
+          <div className="mx-3 my-2 flex items-start gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 rounded-md px-2.5 py-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>Imperative tools (JS API) require Chrome 146+ with <code className="bg-[#1e1e2e] px-1 rounded text-amber-400">chrome://flags/#enable-webmcp-testing</code> enabled.{chromeVersion !== null ? ` You have Chrome ${chromeVersion}.` : " Non-Chrome browser detected."}</span>
           </div>
         )}
 
