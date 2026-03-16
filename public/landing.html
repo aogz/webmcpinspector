@@ -36,17 +36,33 @@
       .logo {
         display: flex;
         align-items: center;
-        gap: 12px;
+        justify-content: space-between;
         margin-bottom: 40px;
+        gap: 20px;
       }
-      .logo svg {
+      .logo-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .logo-left svg {
         width: 40px;
         height: 40px;
       }
-      .logo span {
+      .logo-left span {
         font-size: 24px;
         font-weight: 700;
         color: #fff;
+      }
+      .github-star-widget {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+      }
+      .github-star-widget iframe {
+        border: 0;
+        width: 160px;
+        height: 20px;
       }
 
       h1 {
@@ -97,6 +113,11 @@
       @media (max-width: 540px) {
         .features, .features.three-col { grid-template-columns: 1fr; }
         h1 { font-size: 30px; }
+        .logo {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 14px;
+        }
       }
 
       .feature {
@@ -185,11 +206,20 @@
   <body>
     <div class="container">
       <div class="logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-          <rect width="32" height="32" rx="6" fill="#2563eb"/>
-          <text x="16" y="23" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="bold" font-size="18" fill="white">W</text>
-        </svg>
-        <span>WebMCP Inspector</span>
+        <div class="logo-left">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="6" fill="#2563eb"/>
+            <text x="16" y="23" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="bold" font-size="18" fill="white">W</text>
+          </svg>
+          <span>WebMCP Inspector</span>
+        </div>
+        <div class="github-star-widget">
+          <iframe
+            src="https://ghbtns.com/github-btn.html?user=aogz&amp;repo=webmcpinspector&amp;type=star&amp;count=true"
+            title="GitHub stars for aogz/webmcpinspector"
+            loading="lazy"
+          ></iframe>
+        </div>
       </div>
 
       <h1>Inspect &amp; augment <span class="accent">WebMCP</span> tools on any page</h1>
