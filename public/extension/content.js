@@ -700,7 +700,6 @@ function getGeneratedSchema(formIndex) {
 // ── Webfuse Messaging ───────────────────────────────────────────────
 function sendToolsUpdateQuiet() {
   var forms = scanForms();
-  console.log('[WebMCP content.js] quiet update:', forms.length, 'forms');
   try {
     webfuse.currentSession.sendMessage({
       type: 'webmcp:tools-update',
@@ -715,24 +714,19 @@ function sendToolsUpdateQuiet() {
 function sendToolsUpdate() {
   showScanAnimation();
   var forms = scanForms();
-  console.log('[WebMCP content.js] scanForms result:', forms.length, 'forms found', forms);
   try {
     var msg = {
       type: 'webmcp:tools-update',
       forms: forms,
       imperativeTools: imperativeTools,
     };
-    console.log('[WebMCP content.js] Sending tools-update via sendMessage');
     webfuse.currentSession.sendMessage(msg, '*');
-    console.log('[WebMCP content.js] sendMessage succeeded');
   } catch (e) {
     console.warn('[WebMCP content.js] sendMessage FAILED:', e);
   }
 }
 
 function handleMessage(session, event) {
-  console.log('[WebMCP content.js] handleMessage event:', event);
-
   var data = event && event.data ? event.data : event;
   // The host sends via session.sendMessage({message: payload}, origin)
   // so data may be the payload directly or wrapped in .message
@@ -740,12 +734,8 @@ function handleMessage(session, event) {
     data = data.message;
   }
 
-  console.log('[WebMCP content.js] parsed data:', data);
-
   if (!data || typeof data.type !== 'string') return;
   if (!data.type.startsWith('webmcp:')) return;
-
-  console.log('[WebMCP content.js] processing', data.type);
 
   switch (data.type) {
     case 'webmcp:scan':
@@ -836,37 +826,24 @@ function handleMessage(session, event) {
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────────
-// ── Staging (webmcp-inspector-staging) ──
-// var WIDGET_KEY = 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo';
-// var SPACE_ID = '1872';
 // ── Production (webmcpinspector) ──
 var WIDGET_KEY = 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ';
 var SPACE_ID = '1798';
 
 (function waitForWebfuse() {
   if (typeof webfuse === 'undefined' || !webfuse.isInsideSession) {
-    console.log('[WebMCP content.js] Waiting for webfuse SDK...',
-      'exists:', typeof webfuse !== 'undefined',
-      'isInsideSession:', typeof webfuse !== 'undefined' && webfuse.isInsideSession);
     setTimeout(waitForWebfuse, 200);
     return;
   }
 
-  console.log('[WebMCP content.js] webfuse ready, isInsideSession=true. Calling initSpace...');
-
   webfuse.initSpace(WIDGET_KEY, SPACE_ID, {}).then(function () {
-    console.log('[WebMCP content.js] initSpace resolved, currentSession:', !!webfuse.currentSession);
 
     if (!webfuse.currentSession) {
       console.warn('[WebMCP content.js] currentSession still null after initSpace');
       return;
     }
 
-    console.log('[WebMCP content.js] Setting up message listener');
     webfuse.currentSession.on('message', handleMessage);
-
-    // Send the buffered scan that ran at content-script load time
-    console.log('[WebMCP content.js] Sending buffered initial scan');
     sendToolsUpdate();
 
     // Re-scan on dynamic DOM changes (debounced)
@@ -874,7 +851,6 @@ var SPACE_ID = '1798';
     var observer = new MutationObserver(function () {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () {
-        console.log('[WebMCP content.js] MutationObserver triggered rescan');
         sendToolsUpdateQuiet();
       }, 1000);
     });
@@ -884,7 +860,6 @@ var SPACE_ID = '1798';
       subtree: true,
     });
 
-    console.log('[WebMCP content.js] Bootstrap complete');
   }).catch(function (err) {
     console.error('[WebMCP content.js] initSpace failed:', err);
   });

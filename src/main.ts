@@ -5,9 +5,11 @@ declare const webfuse: any
 const STORAGE_KEY = 'webmcp-overrides'
 const URL_STORAGE_KEY = 'webmcp-last-url'
 const WIDGET_KEY = import.meta.env.DEV
-  ? 'wk_88w0LdNQy0kxUZGRQgmtta30yaQ9rqJo'
+  ? import.meta.env.VITE_WIDGET_KEY_DEV
   : 'wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ'
-const SPACE_ID = import.meta.env.DEV ? '1872' : '1798'
+const SPACE_ID = import.meta.env.DEV
+  ? import.meta.env.VITE_SPACE_ID_DEV
+  : '1798'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -458,7 +460,6 @@ function handleConnect() {
   // ── Exact snippet pattern ──────────────────────────────────────
   webfuse.initSpace(WIDGET_KEY, SPACE_ID, {}).then(function(space: any) {
     webfuse.on('session_started', function(session: any) {
-      console.log('[WebMCP] session_started', session)
       liveSession = session
       sessionObj = session
 
@@ -479,7 +480,6 @@ function handleConnect() {
     })
 
     webfuse.on('session_ended', function() {
-      console.log('[WebMCP] session_ended')
       isConnected = false
       isConnecting = false
       sessionObj = null
