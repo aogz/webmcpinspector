@@ -6,6 +6,10 @@ WebMCP Inspector discovers both **declarative** (HTML form-based) and **imperati
 
 ![WebMCP Inspector screenshot](./public/webmcpinspector.png)
 
+## Live Demo
+
+[https://webmcpinspector.com](https://webmcpinspector.com)
+
 ## Features
 
 ### Tool Discovery
