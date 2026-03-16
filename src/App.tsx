@@ -21,6 +21,24 @@ function normalizeUrl(raw: string): string {
   return u;
 }
 
+function isValidDomain(urlString: string): boolean {
+  try {
+    const u = new URL(urlString);
+    const hostname = u.hostname;
+    // Must have at least one dot (e.g. "example.com"), unless it's localhost
+    if (hostname === "localhost") return true;
+    if (!/^[a-zA-Z0-9.-]+$/.test(hostname)) return false;
+    const parts = hostname.split(".");
+    if (parts.length < 2) return false;
+    // TLD must be at least 2 chars and alphabetic
+    const tld = parts[parts.length - 1];
+    if (tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function loadAllOverrides(): SavedPageOverrides {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
   catch { return {}; }
@@ -84,10 +102,12 @@ export default function App() {
   const setUrl = useCallback((v: string) => {
     setUrlState(v);
     saveUrl(v);
+    setUrlError("");
   }, []);
   const [urlHistory, setUrlHistory] = useState(loadUrlHistory);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [urlError, setUrlError] = useState("");
   const [forms, setForms] = useState<FormTool[]>([]);
   const [imperativeTools, setImperativeTools] = useState<ImperativeTool[]>([]);
   const [schemaResponse, setSchemaResponse] = useState<SchemaResponse | null>(
@@ -260,6 +280,13 @@ export default function App() {
       targetUrl = "https://" + targetUrl;
       setUrl(targetUrl);
     }
+
+    if (!isValidDomain(targetUrl)) {
+      setUrlError("Please enter a valid domain (e.g. example.com)");
+      return;
+    }
+    setUrlError("");
+
     addUrlToHistory(targetUrl);
     setUrlHistory(loadUrlHistory());
 
@@ -430,6 +457,7 @@ export default function App() {
       <Sidebar
         url={url}
         urlHistory={urlHistory}
+        urlError={urlError}
         onUrlChange={setUrl}
         onConnect={handleConnect}
         connected={connected}

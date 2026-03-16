@@ -32,6 +32,7 @@ const supportsImperative = chromeVersion !== null && chromeVersion >= 146;
 interface SidebarProps {
   url: string;
   urlHistory: string[];
+  urlError?: string;
   onUrlChange: (url: string) => void;
   onConnect: () => void;
   connected: boolean;
@@ -52,6 +53,7 @@ interface SidebarProps {
 export default function Sidebar({
   url,
   urlHistory,
+  urlError,
   onUrlChange,
   onConnect,
   connected,
@@ -130,7 +132,7 @@ export default function Sidebar({
                 if (e.key === "Escape") setShowHistory(false);
               }}
               placeholder="https://example.com"
-              className="flex-1 min-w-0 px-3 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded-md text-sm text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]"
+              className={`flex-1 min-w-0 px-3 py-1.5 bg-[#12121a] border rounded-md text-sm text-[#e2e2e8] placeholder-[#6b6b80] focus:outline-none focus:ring-2 ${urlError ? "border-red-500 focus:ring-red-500 focus:border-red-500" : "border-[#1e1e2e] focus:ring-[#2563eb] focus:border-[#2563eb]"}`}
             />
             <button
               onClick={onConnect}
@@ -159,6 +161,9 @@ export default function Sidebar({
                   </button>
                 ))}
             </div>
+          )}
+          {urlError && (
+            <p className="mt-1 text-xs text-red-400">{urlError}</p>
           )}
         </div>
 
