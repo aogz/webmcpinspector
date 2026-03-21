@@ -28,6 +28,9 @@ function getChromeVersion(): number | null {
 
 const chromeVersion = getChromeVersion();
 const supportsImperative = chromeVersion !== null && chromeVersion >= 146;
+const hasModelContext = typeof navigator !== "undefined" && (
+  "modelContext" in navigator || "modelContextTesting" in navigator
+);
 
 interface SidebarProps {
   url: string;
@@ -269,6 +272,16 @@ export default function Sidebar({
           <div className="mx-3 my-2 flex items-start gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 rounded-md px-2.5 py-2">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             <span>Imperative tools (JS API) require Chrome 146+ with <code className="bg-[#1e1e2e] px-1 rounded text-amber-400">chrome://flags/#enable-webmcp-testing</code> enabled.{chromeVersion !== null ? ` You have Chrome ${chromeVersion}.` : " Non-Chrome browser detected."}</span>
+          </div>
+        )}
+
+        {/* Model Context API warning */}
+        {!hasModelContext && (
+          <div className="mx-3 my-2 flex items-start gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 rounded-md px-2.5 py-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              <code className="bg-[#1e1e2e] px-1 rounded text-amber-400">navigator.modelContext</code> is not available. Enable it by navigating to <code className="bg-[#1e1e2e] px-1 rounded text-amber-400">chrome://flags/#enable-webmcp-testing</code> and setting it to <strong>Enabled</strong>, then restart Chrome.
+            </span>
           </div>
         )}
 
