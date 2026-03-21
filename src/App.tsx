@@ -7,12 +7,8 @@ import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, Saved
 const STORAGE_KEY = "webmcp-overrides";
 const URL_STORAGE_KEY = "webmcp-last-url";
 const URL_HISTORY_KEY = "webmcp-url-history";
-const WIDGET_KEY = import.meta.env.DEV
-  ? import.meta.env.VITE_WIDGET_KEY_DEV
-  : "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
-const SPACE_ID = import.meta.env.DEV
-  ? import.meta.env.VITE_SPACE_ID_DEV
-  : "1798";
+const WIDGET_KEY = import.meta.env.VITE_WIDGET_KEY_DEV || "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
+const SPACE_ID = import.meta.env.VITE_SPACE_ID_DEV || "1798";
 
 function normalizeUrl(raw: string): string {
   let u = raw.trim();
@@ -326,6 +322,10 @@ export default function App() {
       // Create session
       const session = spaceRef.current.session();
       sessionRef.current = session;
+
+      session.on("page_info", (...args: unknown[]) => {
+        console.log("page_info", ...args);
+      });
 
       session.on("session_ended", () => {
         setConnected(false);
