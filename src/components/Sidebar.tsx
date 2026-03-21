@@ -35,6 +35,7 @@ const hasModelContext = typeof navigator !== "undefined" && (
 interface SidebarProps {
   url: string;
   urlHistory: string[];
+  pageTitles: Record<string, string>;
   urlError?: string;
   onUrlChange: (url: string) => void;
   onConnect: () => void;
@@ -56,6 +57,7 @@ interface SidebarProps {
 export default function Sidebar({
   url,
   urlHistory,
+  pageTitles,
   urlError,
   onUrlChange,
   onConnect,
@@ -149,8 +151,14 @@ export default function Sidebar({
           {showHistory && urlHistory.length > 0 && (
             <div className="absolute z-10 left-0 right-0 mt-1 bg-[#12121a] border border-[#1e1e2e] rounded-md shadow-lg max-h-48 overflow-y-auto">
               {urlHistory
-                .filter((u) => u.toLowerCase().includes(url.toLowerCase()))
-                .map((historyUrl) => (
+                .filter((u) => {
+                  const q = url.toLowerCase();
+                  const title = pageTitles[u.replace(/\/$/, "")] || "";
+                  return u.toLowerCase().includes(q) || title.toLowerCase().includes(q);
+                })
+                .map((historyUrl) => {
+                  const title = pageTitles[historyUrl.replace(/\/$/, "")] || "";
+                  return (
                   <button
                     key={historyUrl}
                     onMouseDown={(e) => e.preventDefault()}
@@ -160,9 +168,10 @@ export default function Sidebar({
                     }}
                     className="w-full text-left px-3 py-1.5 text-sm text-[#9a9ab0] hover:bg-[#1e1e2e] hover:text-[#60a5fa] truncate cursor-pointer"
                   >
-                    {historyUrl}
+                    {title ? `${title} (${historyUrl})` : historyUrl}
                   </button>
-                ))}
+                  );
+                })}
             </div>
           )}
           {urlError && (

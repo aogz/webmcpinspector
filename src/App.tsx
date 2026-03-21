@@ -7,6 +7,7 @@ import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, Saved
 const STORAGE_KEY = "webmcp-overrides";
 const URL_STORAGE_KEY = "webmcp-last-url";
 const URL_HISTORY_KEY = "webmcp-url-history";
+const TITLES_KEY = "webmcp-page-titles";
 const WIDGET_KEY = import.meta.env.VITE_WIDGET_KEY_DEV || "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
 const SPACE_ID = import.meta.env.VITE_SPACE_ID_DEV || "1798";
 
@@ -91,6 +92,17 @@ function addUrlToHistory(url: string) {
   localStorage.setItem(URL_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
 }
 
+function loadPageTitles(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(TITLES_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function savePageTitle(url: string, title: string) {
+  const titles = loadPageTitles();
+  titles[normalizeUrl(url)] = title;
+  localStorage.setItem(TITLES_KEY, JSON.stringify(titles));
+}
+
 export default function App() {
   const [url, setUrlState] = useState(
     () => getSavedUrl() || ""
@@ -101,6 +113,7 @@ export default function App() {
     setUrlError("");
   }, []);
   const [urlHistory, setUrlHistory] = useState(loadUrlHistory);
+  const [pageTitles, setPageTitles] = useState(loadPageTitles);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [urlError, setUrlError] = useState("");
@@ -325,6 +338,14 @@ export default function App() {
 
       session.on("page_info", (...args: unknown[]) => {
         console.log("page_info", ...args);
+        const info = args[0] as Record<string, unknown> | undefined;
+        if (info && typeof info.title === "string" && info.title) {
+          const pageUrl = normalizeUrl(urlRef.current);
+          if (pageUrl) {
+            savePageTitle(pageUrl, info.title);
+            setPageTitles(loadPageTitles());
+          }
+        }
       });
 
       session.on("session_ended", () => {
@@ -457,6 +478,7 @@ export default function App() {
       <Sidebar
         url={url}
         urlHistory={urlHistory}
+        pageTitles={pageTitles}
         urlError={urlError}
         onUrlChange={setUrl}
         onConnect={handleConnect}
