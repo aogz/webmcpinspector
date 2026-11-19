@@ -159,8 +159,8 @@
       <p class="subtitle">
         Open any page and see every tool it declares through
         <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener noreferrer">WebMCP</a>,
-        whether from script or from forms. Run the tools, grade how ready the page is for agents, see exactly what an agent
-        receives over MCP, and hand the live page to Claude, Codex, Cursor or Zed in one click. Nothing to install.
+        whether from script or from forms. Run the tools, let a model use them, check with evals that it picks the right one, score how ready the
+        page is for agents, see exactly what an agent receives over MCP, and hand the live page to Claude, Codex, Cursor or Zed in one click. Nothing to install.
       </p>
 
       <div class="actions">
@@ -174,7 +174,7 @@
         </div>
         <div class="step">
           <h3>Inspect and fix</h3>
-          <p>See every tool, run it, read the readiness report, and add or fix tools right in the live page.</p>
+          <p>See every tool, run it, check its score, and add or fix tools right in the live page.</p>
         </div>
         <div class="step">
           <h3>Hand it to your agent</h3>
@@ -206,18 +206,22 @@
         <p class="section-label">Test</p>
         <h2>Run the tools, and let models run them</h2>
         <p class="section-lead">Calls run in the real page, so you see what an agent would get.</p>
-        <div class="features">
+        <div class="features two-col">
           <div class="feature">
             <h3>Run tools</h3>
             <p>Arguments built from the schema, a JSON mode and example values. Inputs and results are checked against the schemas. Cancel, set a timeout, replay and diff calls.</p>
           </div>
           <div class="feature">
             <h3>Prompt debugger <span class="badge badge-green">Models</span></h3>
-            <p>Let Gemini Nano on your device, Claude, OpenAI or Gemini use the page's tools with your own key. Tools marked consequential ask you first.</p>
+            <p>Ask in plain words and watch Gemini Nano on your device, Claude, OpenAI or Gemini pick and call the page's tools, with your own key. Tools marked consequential ask you first.</p>
           </div>
           <div class="feature">
-            <h3>Evals and injection test</h3>
-            <p>Check that a model picks the right tool with the right arguments, and see whether hostile text in a tool's result changes what it does.</p>
+            <h3>Evals <span class="badge badge-blue">Tests</span></h3>
+            <p>Write requests with the tool and arguments a model should choose, run them in one go, and see which pass. Rerun after changing a description, or compare models. Import and export as JSON.</p>
+          </div>
+          <div class="feature">
+            <h3>Injection test</h3>
+            <p>Append hostile text to every tool result, as a malicious review would arrive, and see whether the model starts calling tools you never asked for.</p>
           </div>
         </div>
       </section>
@@ -228,7 +232,7 @@
         <p class="section-lead">Find what confuses agents, fix it in place, and take the fix back to the site.</p>
         <div class="features">
           <div class="feature">
-            <h3>Readiness score</h3>
+            <h3>WebMCP score</h3>
             <p>An A–F grade from 35 checks: names, descriptions, schemas, safety hints, invisible characters, instruction-like text and forms. Copy the report or a badge.</p>
           </div>
           <div class="feature">
@@ -236,7 +240,7 @@
             <p>Each tool as the page registered it, next to the copy an agent receives over MCP, with what was added, changed or dropped on the way.</p>
           </div>
           <div class="feature">
-            <h3>Author and export</h3>
+            <h3>Build and export</h3>
             <p>Turn any form into a tool or write a script tool in the live page. Export the markup, a <code>registerTool()</code> snippet, or a Webfuse extension.</p>
           </div>
         </div>

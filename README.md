@@ -1,6 +1,6 @@
 # WebMCP Inspector
 
-Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools of any web page, then hand the live page to your own agent.
+Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools of any web page: run them, let models use them in a prompt debugger, check with evals that a model picks the right tool, and hand the live page to your own agent.
 
 The page opens in a [Webfuse](https://www.webfuse.com) session next to the inspector, so there is nothing to install. In browsers without built-in WebMCP, Webfuse gives the page `document.modelContext` through its polyfill.
 
@@ -19,13 +19,13 @@ Version 2.0.0, rebuilt in November 2026 for the current WebMCP spec (`document.m
 | Without built-in WebMCP (Firefox, Safari, Chrome without WebMCP) | Yes | Yes, through the Webfuse polyfill |
 | Chrome with built-in WebMCP (for example Chrome 151) | Yes | **Not yet.** See below |
 
-Chrome only lets a page in an iframe use its WebMCP when every parent frame grants the `tools` permission (`allow="tools"`). Webfuse's frames don't grant it yet, and Webfuse skips its polyfill when the browser has its own WebMCP. Chrome then rejects every `registerTool()` call with `NotAllowedError`, so pages that declare their tools from script show none. The Tools panel and the readiness report say so when it happens. A fix in Webfuse is in progress.
+Chrome only lets a page in an iframe use its WebMCP when every parent frame grants the `tools` permission (`allow="tools"`). Webfuse's frames don't grant it yet, and Webfuse skips its polyfill when the browser has its own WebMCP. Chrome then rejects every `registerTool()` call with `NotAllowedError`, so pages that declare their tools from script show none. The Tools panel and the Score panel say so when it happens. A fix in Webfuse is in progress.
 
 ### Known limitations
 
 - **Connect your agent** needs the **Automation** app in the Webfuse Space, and the Space's Automation key in `VITE_AUTOMATION_KEY` at build time. Without the app, agents cannot reach the session. Without the key, each visitor has to paste one.
 - **Only the top frame is read.** Tools registered inside iframes are listed as frames, not as tools.
-- **Script tools you add** in the Author panel run through `new Function()`, so pages whose Content Security Policy forbids `eval` refuse them. The inspector shows the error.
+- **Script tools you add** in the Build panel run through `new Function()`, so pages whose Content Security Policy forbids `eval` refuse them. The inspector shows the error.
 - **Form tools return an acknowledgement**, not the page's response, unless the page answers with `SubmitEvent.respondWith()`.
 - **Gemini Nano** needs desktop Chrome 148 or later on supported hardware. Its built-in tool calling is still behind `chrome://flags/#prompt-api-tool-use`, so the text protocol is the default.
 - **Model names** for OpenAI and Gemini are editable defaults (`gpt-5`, `gemini-3.6-flash`), not a maintained list.
@@ -50,7 +50,7 @@ Chrome only lets a page in an iframe use its WebMCP when every parent frame gran
 - **Results** show the value, the duration and which API ran the call (`executeTool()`, the testing API, the tool's own `execute()`, or the inspector filling the form).
 - **Form filling** works with React and other frameworks, and submits only when `toolautosubmit` allows it.
 
-### Readiness
+### Score
 A score from 0 to 100 and a grade from A to F, from 35 checks:
 - **names:** invalid, starting with something other than a letter, reserved by Webfuse, or duplicated, including a script tool that hides a form tool of the same name;
 - **descriptions:** missing, too short or too long, containing invisible or direction-changing Unicode, or reading like instructions to the agent;
@@ -89,7 +89,7 @@ It suggests a first task from the page's tools. It also tells the agent to call 
 
 The links are the same intent links as the [Webfuse agent playground](https://playground.x.aogz.me).
 
-### Author and export
+### Build and export
 - **Script tools:** write a tool (name, title, description, input and output schemas, annotations, `execute` body) and register it in the live page. Tools are saved per page and come back on every visit. You can switch them off, edit or delete them.
 - **Form augmentation:** turn any form into a tool, or fix the attributes of one that already is. Changes are saved per page in your browser and reapplied when the page loads.
 - **Export:**
@@ -97,11 +97,13 @@ The links are the same intent links as the [Webfuse agent playground](https://pl
   - a `registerTool()` snippet with feature detection;
   - a Webfuse extension (`manifest.json` and `content.js`) that applies your form changes and script tools for every visitor of a Space, without changing the site.
 
-### Prompt debugger
-- **Models:** Gemini Nano on the device, Claude (Opus 5.5, Sonnet 5.5 or Haiku 5.5), OpenAI or Gemini. API providers use your own key, which stays in your browser and goes only to that provider. Claude calls use server-side refusal fallbacks (`fallbacks: "default"`).
-- **Chat:** the model uses the page's tools, and you see every call and result. Tools with `consequentialHint` ask you before they run.
-- **Evals:** each case pairs a request with the tool and arguments it should produce. The inspector records what the model calls without running the tool, and reports passes. You can import and export the cases.
-- **Injection test:** appends hostile text to each tool result and reports whether the model followed it.
+### Prompt debugger and evals
+The **Prompt** panel lets a language model use the page's tools, so you see how an agent reads them before you ship.
+
+- **Models:** Gemini Nano on the device, Claude (Opus 5.5, Sonnet 5.5 or Haiku 5.5), OpenAI or Gemini. API providers use your own key, which stays in your browser and goes only to that provider. Claude calls use server-side refusal fallbacks (`fallbacks: "default"`). Gemini Nano can use the Prompt API's built-in tool calling where Chrome has it turned on.
+- **Chat:** ask for something in plain words and the model calls the page's tools to do it. Every call and result shows in the conversation and in the Calls log. Tools with `consequentialHint` ask you before they run.
+- **Evals:** a set of test cases for the page. Each case is a request, the tool the model should call (or none), and the arguments it should pass, matched partially and case-insensitively. Running the set records what the model calls without running the tools, and shows which cases pass. Cases are saved per page and can be imported and exported as JSON, so you can rerun them after changing a tool's description or schema, or compare models.
+- **Injection test:** appends hostile text to every tool result, the way a malicious review or product description would arrive, and reports whether the model then called tools you did not ask for.
 
 ### Activity and calls
 - **Activity log:** session events, tool discovery, registrations and removals, `toolactivated` / `toolcancel`, agent submissions and `respondWith()`, augmentations and errors. Filter by kind, expand an entry for details, export as JSON.
@@ -109,6 +111,7 @@ The links are the same intent links as the [Webfuse agent playground](https://pl
 - **Copy report:** page, WebMCP implementation, browser, tools, recent calls and activity as Markdown, ready to paste into a bug report.
 
 ### Workflow
+- **Links to an inspection:** `/inspect/?url=<page>` opens the inspector and starts a session on that page right away, for example [`/inspect/?url=https://googlechromelabs.github.io/webmcp-tools/demos/french-bistro/`](https://webmcpinspector.com/inspect/?url=https%3A%2F%2Fgooglechromelabs.github.io%2Fwebmcp-tools%2Fdemos%2Ffrench-bistro%2F). The address bar follows the page you are inspecting, so copying it shares the inspection; the command palette also has "Copy a link that opens this page in the inspector".
 - **URL bar:** remembers recent pages with their titles, and refuses `localhost` URLs, which Webfuse cannot reach.
 - **Themes:** light and dark, following the system unless you choose one.
 - **Keyboard:** a command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>) for every panel and tool, <kbd>/</kbd> to jump to the URL bar and <kbd>R</kbd> to scan again.
@@ -200,7 +203,7 @@ src/
     report.ts             The "Copy report" text
     storage.ts            localStorage, with migration of version 1 data
     llm/                  Gemini Nano, Claude, OpenAI and Gemini providers
-  components/             Panels (Tools, Readiness, Agent view, Author, Prompt), Dock,
+  components/             Panels (Tools, Score, Agent view, Build, Prompt), Dock,
                           Connect your agent, URL bar, command palette, argument editor
   extension/
     content.ts            Runs in the page: reads tools and forms, runs calls, applies changes
@@ -209,7 +212,7 @@ src/
   shared/
     protocol.ts           Messages between the app and the extension
     types.ts              Snapshot, tool, form and call types
-    lint.ts               Readiness checks and score
+    lint.ts               Score checks
     agentView.ts          How the Webfuse Session MCP Server translates page tools
     webfuse.ts            Webfuse's reserved tool names and name rules
     jsonSchema.ts         Validation, schema checks, example values
