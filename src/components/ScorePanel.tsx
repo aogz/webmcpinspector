@@ -22,7 +22,7 @@ const GRADE_TONE: Record<Report["grade"], string> = {
 
 function reportMarkdown(report: Report, snapshot: PageSnapshot): string {
   const lines = [
-    `## WebMCP readiness: ${report.grade} (${report.score}/100)`,
+    `## WebMCP score: ${report.grade} (${report.score}/100)`,
     "",
     `Page: ${snapshot.url}`,
     `Tools: ${report.toolCount} · Forms that could become tools: ${report.candidateForms}`,
@@ -56,7 +56,7 @@ function FindingRow({ finding }: { finding: Finding }) {
   );
 }
 
-export default function ReadinessPanel({ snapshot }: { snapshot: PageSnapshot | null }) {
+export default function ScorePanel({ snapshot }: { snapshot: PageSnapshot | null }) {
   const report = useMemo(() => lintSnapshot(snapshot), [snapshot]);
   if (!snapshot) return <p className="p-4 text-xs text-muted">Open a page to check how ready it is for agents.</p>;
   const counts = {
@@ -73,7 +73,7 @@ export default function ReadinessPanel({ snapshot }: { snapshot: PageSnapshot | 
           <span className="text-[10px]">{report.score}</span>
         </div>
         <div className="min-w-0 text-xs text-muted space-y-0.5">
-          <p className="font-medium text-fg">WebMCP readiness</p>
+          <p className="font-medium text-fg">WebMCP score</p>
           <p>
             {report.toolCount} tool{report.toolCount === 1 ? "" : "s"} · {counts.error} error{counts.error === 1 ? "" : "s"} · {counts.warning} warning
             {counts.warning === 1 ? "" : "s"}

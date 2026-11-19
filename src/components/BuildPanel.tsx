@@ -122,7 +122,7 @@ function InjectedRow({ tool, onEdit }: { tool: SavedInjected; onEdit: () => void
   );
 }
 
-export default function AuthorPanel({ snapshot }: { snapshot: PageSnapshot | null }) {
+export default function BuildPanel({ snapshot }: { snapshot: PageSnapshot | null }) {
   const injected = useInspector((s) => s.injected);
   const [editing, setEditing] = useState<InjectedToolDef | null>(null);
   const [exportTool, setExportTool] = useState("");

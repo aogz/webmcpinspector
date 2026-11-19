@@ -369,7 +369,7 @@ export default function ToolsPanel({ snapshot }: { snapshot: PageSnapshot | null
         tools.map((tool) => <ToolCard key={`${tool.source}:${tool.name}`} tool={tool} />)
       ) : (
         <p className="px-3 pb-2 text-xs text-faint">
-          {snapshot.tools.length ? "No tool matches the filter." : "No tools yet. Make a form below into a tool, or add a script tool under Author."}
+          {snapshot.tools.length ? "No tool matches the filter." : "No tools yet. Make a form below into a tool, or add a script tool under Build."}
         </p>
       )}
       {toolForms.length > 0 && (

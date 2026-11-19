@@ -4,9 +4,9 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "../app/store";
 import AgentViewPanel from "../components/AgentViewPanel";
-import AuthorPanel from "../components/AuthorPanel";
+import BuildPanel from "../components/BuildPanel";
 import PromptPanel from "../components/PromptPanel";
-import ReadinessPanel from "../components/ReadinessPanel";
+import ScorePanel from "../components/ScorePanel";
 import ToolsPanel from "../components/ToolsPanel";
 import type { PageSnapshot } from "../shared/types";
 
@@ -80,9 +80,9 @@ const snapshot: PageSnapshot = {
 describe("panels", () => {
   it.each([
     ["Tools", ToolsPanel],
-    ["Readiness", ReadinessPanel],
+    ["Score", ScorePanel],
     ["Agent view", AgentViewPanel],
-    ["Author", AuthorPanel],
+    ["Build", BuildPanel],
     ["Prompt", PromptPanel],
   ])("%s mounts and unmounts cleanly", async (_name, Panel) => {
     (store as unknown as { set: (p: object) => void }).set({ status: "live", extension: "ok", snapshot });
@@ -108,7 +108,7 @@ describe("app", () => {
     await act(async () => root.render(createElement(App)));
     const tab = (label: string) =>
       Array.from(host.querySelectorAll('[role="tab"]')).find((t) => t.textContent?.startsWith(label)) as HTMLElement;
-    for (const label of ["Readiness", "Author", "Tools", "Agent view", "Prompt", "Tools", "Author", "Prompt", "Readiness", "Tools"]) {
+    for (const label of ["Score", "Build", "Tools", "Agent view", "Prompt", "Tools", "Build", "Prompt", "Score", "Tools"]) {
       await act(async () => tab(label).click());
       expect(host.textContent?.length, `after ${label}`).toBeGreaterThan(50);
     }

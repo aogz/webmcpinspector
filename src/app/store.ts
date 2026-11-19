@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { hostOf, track } from "../analytics";
 import { MCP_URL_OVERRIDE, SPACE_ID, WIDGET_KEY } from "../config";
 import { validate, type SchemaError } from "../shared/jsonSchema";
+import { syncAddressBar, urlFromSearch } from "./shareLink";
 import { envelope, PROTOCOL_VERSION, unwrapMessage, type AppToPage } from "../shared/protocol";
 import type {
   ExecuteOutcome,
@@ -163,6 +164,18 @@ class InspectorStore {
 
   // ── Session ───────────────────────────────────────────────────────
 
+  private startedFromQuery = false;
+
+  /** Opens the page named by `?url=`, so a link can take someone straight to an inspection. */
+  startFromQuery = () => {
+    if (this.startedFromQuery) return;
+    this.startedFromQuery = true;
+    const url = urlFromSearch(window.location.search);
+    if (!url) return;
+    this.setTargetUrl(url);
+    void this.connect();
+  };
+
   connect = async () => {
     const { url, error } = validTarget(this.state.targetUrl);
     if (!url) {
@@ -171,12 +184,11 @@ class InspectorStore {
     }
     this.setTargetUrl(url);
     this.set({ urlHistory: addUrlToHistory(url) });
+    syncAddressBar(url);
 
     if (this.session && this.state.status === "live") {
       this.resetPage();
-      const tabs = await this.session.getTabs();
-      tabs.forEach((tab) => this.session?.closeTab(tab.ssid));
-      await this.session.openTab(url);
+      await this.showInFirstTab(this.session, url, false);
       this.log("navigate", `Opened ${url}`);
       track("Tab Opened", { host: hostOf(url) });
       this.waitForExtension();
@@ -190,11 +202,10 @@ class InspectorStore {
       this.session = session;
       this.bindSession(session);
 
-      // The session object passed to session_started is the one whose openTab works.
+      // The session object passed to session_started is the one whose tab methods work.
       const opened = new Promise<void>((resolve) => {
         window.webfuse.on("session_started", (started: unknown) => {
-          void (started as WebfuseSession).openTab(url);
-          resolve();
+          void this.showInFirstTab(started as WebfuseSession, url, true).finally(resolve);
         });
       });
       await session.start("#webfuse-container");
@@ -222,6 +233,35 @@ class InspectorStore {
       this.log("error", "Session failed to start", String(err));
     }
   };
+
+  /**
+   * Shows `url` in the session's first tab and closes the others. Some Spaces (with the Automation
+   * app, for one) start every session with a tab already open, so opening another would make the
+   * inspected page the second tab.
+   */
+  private async showInFirstTab(session: WebfuseSession, url: string, newSession: boolean) {
+    const listTabs = async () => {
+      try {
+        return ((await session.getTabs()) ?? []).filter((tab) => !tab.isMediaSharing);
+      } catch {
+        return [];
+      }
+    };
+    let tabs = await listTabs();
+    // A Space's starting tab can appear a moment after session_started.
+    for (let i = 0; newSession && !tabs.length && i < 8; i++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      tabs = await listTabs();
+    }
+    const [first, ...rest] = tabs;
+    if (!first) {
+      await session.openTab(url);
+      return;
+    }
+    await session.relocateTab(url, first.ssid);
+    session.activateTab?.(first.ssid);
+    rest.forEach((tab) => session.closeTab(tab.ssid));
+  }
 
   private resetPage() {
     this.restoredFor = "";
@@ -357,6 +397,7 @@ class InspectorStore {
       injected: pageChanged ? injectedFor(snapshot.url) : this.state.injected,
     });
     if (pageChanged) {
+      syncAddressBar(snapshot.url);
       const imperative = snapshot.tools.filter((t) => t.source !== "declarative").length;
       const declarative = snapshot.tools.length - imperative;
       this.log("tools", `${hostOf(snapshot.url) || snapshot.url}: ${snapshot.tools.length} tools (${declarative} form, ${imperative} script), ${snapshot.forms.length} forms`);

@@ -3,22 +3,24 @@ import { AlertTriangle, Github, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Se
 import { DEFAULT_URLS, readString, STORAGE_KEYS, writeString } from "./app/storage";
 import { store, useInspector } from "./app/store";
 import AgentViewPanel from "./components/AgentViewPanel";
-import AuthorPanel from "./components/AuthorPanel";
+import BuildPanel from "./components/BuildPanel";
 import CommandPalette, { type PaletteAction } from "./components/CommandPalette";
 import ConnectAgent from "./components/ConnectAgent";
 import Dock from "./components/Dock";
-import ReadinessPanel from "./components/ReadinessPanel";
+import ScorePanel from "./components/ScorePanel";
 import ToolsPanel from "./components/ToolsPanel";
 import { Notice, Tabs } from "./components/ui";
 import { cx } from "./components/uiUtils";
 import UrlBar from "./components/UrlBar";
 import { REPO_URL } from "./config";
 import { lintSnapshot } from "./shared/lint";
+import { inspectLink } from "./app/shareLink";
+import { copyText } from "./components/uiUtils";
 
 // Loaded on first use: it carries the model SDKs.
 const PromptPanel = lazy(() => import("./components/PromptPanel"));
 
-type Panel = "tools" | "ready" | "agent" | "author" | "prompt";
+type Panel = "tools" | "score" | "agent" | "build" | "prompt";
 type Theme = "system" | "light" | "dark";
 
 function applyTheme(theme: Theme) {
@@ -86,6 +88,10 @@ export default function App() {
   const report = useMemo(() => lintSnapshot(snapshot), [snapshot]);
 
   useEffect(() => {
+    store.startFromQuery();
+  }, []);
+
+  useEffect(() => {
     applyTheme(theme);
     writeString(STORAGE_KEYS.theme, theme === "system" ? "" : theme);
   }, [theme]);
@@ -113,9 +119,17 @@ export default function App() {
     { id: "url", label: "Go to URL", hint: "/", run: () => urlRef.current?.focus() },
     { id: "rescan", label: "Scan the page again", hint: "R", run: () => store.rescan(true) },
     { id: "agent", label: "Connect your agent", run: () => setAgentOpen(true) },
-    ...(["tools", "ready", "agent", "author", "prompt"] as Panel[]).map((p) => ({
+    {
+      id: "share",
+      label: "Copy a link that opens this page in the inspector",
+      run: () => {
+        const target = store.getState().snapshot?.url || store.getState().targetUrl;
+        if (target) void copyText(inspectLink(target, window.location));
+      },
+    },
+    ...(["tools", "score", "agent", "build", "prompt"] as Panel[]).map((p) => ({
       id: `panel-${p}`,
-      label: `Show ${{ tools: "Tools", ready: "Readiness", agent: "Agent view", author: "Author", prompt: "Prompt debugger" }[p]}`,
+      label: `Show ${{ tools: "Tools", score: "Score", agent: "Agent view", build: "Build", prompt: "Prompt debugger" }[p]}`,
       run: () => {
         setSidebarOpen(true);
         setPanel(p);
@@ -172,10 +186,10 @@ export default function App() {
             tabs={[
               { id: "tools", label: "Tools", count: snapshot?.tools.length },
               {
-                id: "ready",
+                id: "score",
                 label: (
                   <span className="inline-flex items-center gap-1">
-                    Readiness
+                    Score
                     {snapshot && (
                       <span className={cx("rounded px-1 text-[10px] font-bold", report.score >= 75 ? "bg-ok-soft text-ok" : report.score >= 40 ? "bg-warn-soft text-warn" : "bg-err-soft text-err")}>
                         {report.grade}
@@ -185,15 +199,15 @@ export default function App() {
                 ),
               },
               { id: "agent", label: "Agent view" },
-              { id: "author", label: "Author" },
+              { id: "build", label: "Build" },
               { id: "prompt", label: "Prompt" },
             ]}
           />
           <div className={cx("min-h-0 flex-1", panel === "prompt" ? "flex flex-col" : "overflow-y-auto")}>
             {panel === "tools" && <ToolsPanel snapshot={snapshot} />}
-            {panel === "ready" && <ReadinessPanel snapshot={snapshot} />}
+            {panel === "score" && <ScorePanel snapshot={snapshot} />}
             {panel === "agent" && <AgentViewPanel snapshot={snapshot} onConnect={() => setAgentOpen(true)} />}
-            {panel === "author" && <AuthorPanel snapshot={snapshot} />}
+            {panel === "build" && <BuildPanel snapshot={snapshot} />}
             {panel === "prompt" && (
               <Suspense fallback={<p className="p-4 text-xs text-muted">Loading…</p>}>
                 <PromptPanel snapshot={snapshot} />

@@ -3,6 +3,9 @@ declare global {
     ssid: number;
     url: string;
     title: string;
+    active?: boolean;
+    isMediaSharing?: boolean;
+    newTab?: boolean;
   }
 
   interface WebfuseSession {
@@ -14,7 +17,8 @@ declare global {
     closeTab(ssid: number): void;
     getTabs(): Promise<WebfuseTab[]>;
     getActiveTab(): Promise<WebfuseTab>;
-    relocateTab(newUrl: string, ssid?: number): void;
+    relocateTab(newUrl: string, ssid?: number): Promise<unknown> | void;
+    activateTab?(ssid: number): unknown;
     end(redirectUrl?: string): void;
     on(eventName: string, callback: (...args: unknown[]) => void): WebfuseSession;
     sendMessage(message: unknown, targetOrigin: string): void;
