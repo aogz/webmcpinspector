@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composePrompt, dynamicUrl, LINKS, serverNameFor, type AgentContext } from "../app/agentLinks";
+import { composePrompt, dynamicUrl, LINKS, serverNameFor, suggestTask, type AgentContext } from "../app/agentLinks";
 
 const ctx: AgentContext = {
   sessionId: "s123",
@@ -25,6 +25,21 @@ describe("agent links", () => {
     expect(prompt).toContain("claude mcp add --transport http --scope user webfuse-webmcp-inspector");
     expect(prompt).toContain("bookTable");
     expect(prompt.endsWith("Task: Book a table")).toBe(true);
+  });
+
+  it("never tells the agent a page has no tools, because the inspector's list can be incomplete", () => {
+    const prompt = composePrompt("desktop", { ...ctx, toolNames: [] });
+    expect(prompt).not.toMatch(/declares no WebMCP tools/);
+    expect(prompt).toContain("call tools/list");
+    expect(prompt).toContain("[Custom Tool] [Page-declared");
+  });
+
+  it("suggests using the page's tools, not designing new ones", () => {
+    for (const names of [[], ["searchFlights"], ["a", "b"]]) {
+      const task = suggestTask(names, ctx.pageUrl);
+      expect(task).toMatch(/^Use the WebMCP tools/);
+      expect(task).not.toMatch(/would make good/);
+    }
   });
 
   it("gives each agent its own setup line", () => {
