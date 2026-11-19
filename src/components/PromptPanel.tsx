@@ -236,7 +236,10 @@ function Chat({ settings, snapshot, security }: { settings: ReturnType<typeof us
   const endRef = useRef<HTMLDivElement>(null);
   const counter = useRef(0);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [entries]);
+  useEffect(() => {
+    // Braces matter: Chrome's scrollIntoView() returns a Promise, which React would call as the cleanup.
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [entries]);
 
   const push = (entry: Omit<ChatEntry, "id">) => setEntries((prev) => [...prev, { ...entry, id: ++counter.current }]);
 
