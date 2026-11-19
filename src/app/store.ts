@@ -76,6 +76,35 @@ const MAX_ACTIVITY = 500;
 const MAX_CALLS = 200;
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
+function sessionOriginOf(session: WebfuseSession | null): string {
+  try {
+    return session ? new URL(session.sessionLink).origin : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Webfuse's own pages, such as the Automation app's start page, are not pages anyone inspects. */
+export function isWebfusePage(url: string, sessionOrigin: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.pathname.includes("/internal_app_scripts/") || (!!sessionOrigin && u.origin === sessionOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function sameDocument(a: string | undefined, b: string): boolean {
+  if (!a) return false;
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.origin === y.origin && x.pathname.replace(/\/+$/, "") === y.pathname.replace(/\/+$/, "") && x.search === y.search;
+  } catch {
+    return false;
+  }
+}
+
 function validTarget(raw: string): { url?: string; error?: string } {
   let value = raw.trim();
   if (!value) return { error: "Enter a URL." };
@@ -236,10 +265,11 @@ class InspectorStore {
 
   /**
    * Shows `url` in the session's first tab and closes the others. Some Spaces (with the Automation
-   * app, for one) start every session with a tab already open, so opening another would make the
-   * inspected page the second tab.
+   * app, for one) start every session with a tab on their own start page, so opening another tab
+   * would make the inspected page the second one.
    */
   private async showInFirstTab(session: WebfuseSession, url: string, newSession: boolean) {
+    const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
     const listTabs = async () => {
       try {
         return ((await session.getTabs()) ?? []).filter((tab) => !tab.isMediaSharing);
@@ -247,10 +277,15 @@ class InspectorStore {
         return [];
       }
     };
+    const origin = sessionOriginOf(session);
+    const settled = (tabUrl: string | undefined) => !!tabUrl && tabUrl !== "about:blank";
+    const arrived = (tabUrl: string | undefined) =>
+      sameDocument(tabUrl, url) || (settled(tabUrl) && !isWebfusePage(tabUrl ?? "", origin));
+
     let tabs = await listTabs();
-    // A Space's starting tab can appear a moment after session_started.
-    for (let i = 0; newSession && !tabs.length && i < 8; i++) {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    // The starting tab can appear, and pick its start page, a moment after session_started.
+    for (let i = 0; newSession && (!tabs.length || !settled(tabs[0].url)) && i < 16; i++) {
+      await sleep(250);
       tabs = await listTabs();
     }
     const [first, ...rest] = tabs;
@@ -258,9 +293,17 @@ class InspectorStore {
       await session.openTab(url);
       return;
     }
-    await session.relocateTab(url, first.ssid);
-    session.activateTab?.(first.ssid);
     rest.forEach((tab) => session.closeTab(tab.ssid));
+    session.activateTab?.(first.ssid);
+    // A start page that finishes loading after our navigation replaces it, so check and retry.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await session.relocateTab(url, first.ssid);
+      for (let i = 0; i < 8; i++) {
+        await sleep(250);
+        const tab = (await listTabs()).find((t) => t.ssid === first.ssid);
+        if (arrived(tab?.url)) return;
+      }
+    }
   }
 
   private resetPage() {
@@ -389,7 +432,8 @@ class InspectorStore {
   private onSnapshot(snapshot: PageSnapshot) {
     const previous = this.state.snapshot;
     const pageChanged = !previous || previous.instance !== snapshot.instance;
-    const titles = snapshot.title ? saveTitle(snapshot.url, snapshot.title) : this.state.titles;
+    const internal = isWebfusePage(snapshot.url, this.state.sessionOrigin);
+    const titles = snapshot.title && !internal ? saveTitle(snapshot.url, snapshot.title) : this.state.titles;
     this.set({
       snapshot,
       extension: "ok",
@@ -397,7 +441,7 @@ class InspectorStore {
       injected: pageChanged ? injectedFor(snapshot.url) : this.state.injected,
     });
     if (pageChanged) {
-      syncAddressBar(snapshot.url);
+      if (!internal) syncAddressBar(snapshot.url);
       const imperative = snapshot.tools.filter((t) => t.source !== "declarative").length;
       const declarative = snapshot.tools.length - imperative;
       this.log("tools", `${hostOf(snapshot.url) || snapshot.url}: ${snapshot.tools.length} tools (${declarative} form, ${imperative} script), ${snapshot.forms.length} forms`);
