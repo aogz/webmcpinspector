@@ -1,502 +1,228 @@
-import { useState, useRef, useCallback } from "react";
-import Sidebar from "./components/Sidebar";
-import MainContent from "./components/MainContent";
-import { track } from "./analytics";
-import type { FormTool, ImperativeTool, SchemaResponse, SavedFormOverride, SavedPageOverrides, HistoryEntry, ToolExecutionResult } from "./types";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Github, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from "lucide-react";
+import { DEFAULT_URLS, readString, STORAGE_KEYS, writeString } from "./app/storage";
+import { store, useInspector } from "./app/store";
+import AgentViewPanel from "./components/AgentViewPanel";
+import AuthorPanel from "./components/AuthorPanel";
+import CommandPalette, { type PaletteAction } from "./components/CommandPalette";
+import ConnectAgent from "./components/ConnectAgent";
+import Dock from "./components/Dock";
+import ReadinessPanel from "./components/ReadinessPanel";
+import ToolsPanel from "./components/ToolsPanel";
+import { Notice, Tabs } from "./components/ui";
+import { cx } from "./components/uiUtils";
+import UrlBar from "./components/UrlBar";
+import { REPO_URL } from "./config";
+import { lintSnapshot } from "./shared/lint";
 
-const STORAGE_KEY = "webmcp-overrides";
-const URL_STORAGE_KEY = "webmcp-last-url";
-const URL_HISTORY_KEY = "webmcp-url-history";
-const TITLES_KEY = "webmcp-page-titles";
-const WIDGET_KEY = import.meta.env.VITE_WIDGET_KEY_DEV || "wk_tqCYlFrDmS_UGqhLcI_Wn6Y1DDTMaTSQ";
-const SPACE_ID = import.meta.env.VITE_SPACE_ID_DEV || "1798";
+// Loaded on first use: it carries the model SDKs.
+const PromptPanel = lazy(() => import("./components/PromptPanel"));
 
-function normalizeUrl(raw: string): string {
-  let u = raw.trim();
-  if (!u) return "";
-  if (u.endsWith("/")) u = u.slice(0, -1);
-  return u;
+type Panel = "tools" | "ready" | "agent" | "author" | "prompt";
+type Theme = "system" | "light" | "dark";
+
+function applyTheme(theme: Theme) {
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
 }
 
-function isValidDomain(urlString: string): boolean {
-  try {
-    const u = new URL(urlString);
-    const hostname = u.hostname;
-    // Must have at least one dot (e.g. "example.com"), unless it's localhost
-    if (hostname === "localhost") return true;
-    if (!/^[a-zA-Z0-9.-]+$/.test(hostname)) return false;
-    const parts = hostname.split(".");
-    if (parts.length < 2) return false;
-    // TLD must be at least 2 chars and alphabetic
-    const tld = parts[parts.length - 1];
-    if (tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) return false;
-    return true;
-  } catch {
-    return false;
-  }
+function isTyping(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 }
 
-function loadAllOverrides(): SavedPageOverrides {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-  catch { return {}; }
-}
-
-function saveAllOverrides(data: SavedPageOverrides) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function getOverridesForUrl(url: string): SavedFormOverride[] {
-  return loadAllOverrides()[normalizeUrl(url)] || [];
-}
-
-function saveOverrideForUrl(url: string, override: SavedFormOverride) {
-  const key = normalizeUrl(url);
-  const all = loadAllOverrides();
-  const existing = all[key] || [];
-  const idx = existing.findIndex((o) => o.formId === override.formId);
-  if (idx >= 0) existing[idx] = override;
-  else existing.push(override);
-  all[key] = existing;
-  saveAllOverrides(all);
-}
-
-function getSavedUrl(): string {
-  return localStorage.getItem(URL_STORAGE_KEY) || "";
-}
-
-function saveUrl(url: string) {
-  localStorage.setItem(URL_STORAGE_KEY, url);
-}
-
-const DEFAULT_URLS = [
-  "https://googlechromelabs.github.io/webmcp-tools/demos/french-bistro/",
-  "https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/",
-];
-
-function loadUrlHistory(): string[] {
-  try {
-    const saved: string[] = JSON.parse(localStorage.getItem(URL_HISTORY_KEY) || "[]");
-    const merged = [...saved];
-    for (const u of DEFAULT_URLS) {
-      if (!merged.includes(u)) merged.push(u);
-    }
-    return merged;
-  } catch { return [...DEFAULT_URLS]; }
-}
-
-function addUrlToHistory(url: string) {
-  const normalized = url.trim();
-  if (!normalized) return;
-  const history = loadUrlHistory().filter((u) => u !== normalized);
-  history.unshift(normalized);
-  localStorage.setItem(URL_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
-}
-
-function loadPageTitles(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(TITLES_KEY) || "{}"); }
-  catch { return {}; }
-}
-
-function savePageTitle(url: string, title: string) {
-  const titles = loadPageTitles();
-  titles[normalizeUrl(url)] = title;
-  localStorage.setItem(TITLES_KEY, JSON.stringify(titles));
+function SessionOverlay() {
+  const status = useInspector((s) => s.status);
+  const error = useInspector((s) => s.error);
+  if (status === "live") return null;
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-bg p-6">
+      <div className="max-w-md space-y-3 text-center">
+        {status === "connecting" ? (
+          <p className="text-sm text-muted">Starting a Webfuse session…</p>
+        ) : status === "error" ? (
+          <>
+            <h2 className="text-base font-semibold text-fg">The session didn't start</h2>
+            <p className="text-sm text-muted">{error}</p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-base font-semibold text-fg">{status === "ended" ? "Session ended" : "Inspect WebMCP tools on any page"}</h2>
+            <p className="text-sm text-muted">
+              Enter a URL. The page opens in a live Webfuse session with WebMCP available in any browser, and its tools show up on the
+              left.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {DEFAULT_URLS.map((u) => (
+                <button
+                  key={u}
+                  onClick={() => {
+                    store.setTargetUrl(u);
+                    void store.connect();
+                  }}
+                  className="truncate rounded-md border border-line px-3 py-1.5 text-xs text-accent-text hover:border-accent cursor-pointer"
+                >
+                  Try {u.replace(/^https:\/\/googlechromelabs\.github\.io\/webmcp-tools\/demos\//, "the ").replace(/\/$/, "")} demo
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
-  const [url, setUrlState] = useState(
-    () => getSavedUrl() || ""
-  );
-  const setUrl = useCallback((v: string) => {
-    setUrlState(v);
-    saveUrl(v);
-    setUrlError("");
-  }, []);
-  const [urlHistory, setUrlHistory] = useState(loadUrlHistory);
-  const [pageTitles, setPageTitles] = useState(loadPageTitles);
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [urlError, setUrlError] = useState("");
-  const [forms, setForms] = useState<FormTool[]>([]);
-  const [imperativeTools, setImperativeTools] = useState<ImperativeTool[]>([]);
-  const [schemaResponse, setSchemaResponse] = useState<SchemaResponse | null>(
-    null
-  );
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const snapshot = useInspector((s) => s.snapshot);
+  const status = useInspector((s) => s.status);
+  const extension = useInspector((s) => s.extension);
+  const [panel, setPanel] = useState<Panel>("tools");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [executionResults, setExecutionResults] = useState<Record<string, ToolExecutionResult>>({});
-  const sessionRef = useRef<WebfuseSession | null>(null);
-  const spaceRef = useRef<WebfuseSpace | null>(null);
-  const urlRef = useRef(url);
-  urlRef.current = url;
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>(() => (readString(STORAGE_KEYS.theme) as Theme) || "system");
+  const urlRef = useRef<HTMLInputElement>(null);
+  const report = useMemo(() => lintSnapshot(snapshot), [snapshot]);
 
-  const addHistory = useCallback((type: HistoryEntry["type"], message: string) => {
-    setHistory((prev) => [{ timestamp: Date.now(), type, message }, ...prev]);
+  useEffect(() => {
+    applyTheme(theme);
+    writeString(STORAGE_KEYS.theme, theme === "system" ? "" : theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+        return;
+      }
+      if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        urlRef.current?.focus();
+      } else if (e.key === "r" && store.getState().status === "live") {
+        store.rescan(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const sendToSession = useCallback((msg: Record<string, unknown>) => {
-    if (sessionRef.current) {
-      sessionRef.current.sendMessage(msg, "*");
-    }
-  }, []);
+  const actions: PaletteAction[] = [
+    { id: "url", label: "Go to URL", hint: "/", run: () => urlRef.current?.focus() },
+    { id: "rescan", label: "Scan the page again", hint: "R", run: () => store.rescan(true) },
+    { id: "agent", label: "Connect your agent", run: () => setAgentOpen(true) },
+    ...(["tools", "ready", "agent", "author", "prompt"] as Panel[]).map((p) => ({
+      id: `panel-${p}`,
+      label: `Show ${{ tools: "Tools", ready: "Readiness", agent: "Agent view", author: "Author", prompt: "Prompt debugger" }[p]}`,
+      run: () => {
+        setSidebarOpen(true);
+        setPanel(p);
+      },
+    })),
+    { id: "theme", label: `Theme: switch to ${theme === "dark" ? "light" : "dark"}`, run: () => setTheme(theme === "dark" ? "light" : "dark") },
+    ...(snapshot?.tools ?? []).map((t) => ({
+      id: `tool-${t.name}`,
+      label: `Tool: ${t.name}`,
+      run: () => {
+        setSidebarOpen(true);
+        setPanel("tools");
+      },
+    })),
+  ];
 
-  const pendingCallbacks = useRef<Record<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>>({});
-
-  const executeToolAsync = useCallback((toolName: string, args: Record<string, unknown>): Promise<unknown> => {
-    const requestId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    sendToSession({
-      type: "webmcp:execute-tool",
-      requestId,
-      toolName,
-      args,
-    });
-    track("Tool Executed", { tool: toolName });
-    addHistory("tool_executed", `Executed ${toolName}`);
-    return new Promise((resolve, reject) => {
-      pendingCallbacks.current[requestId] = { resolve, reject };
-      setTimeout(() => {
-        if (pendingCallbacks.current[requestId]) {
-          delete pendingCallbacks.current[requestId];
-          reject(new Error(`Tool execution timed out: ${toolName}`));
-        }
-      }, 30000);
-    });
-  }, [sendToSession, addHistory]);
-
-  const handleSaveOverrides = useCallback((override: SavedFormOverride) => {
-    const targetUrl = normalizeUrl(urlRef.current);
-    if (!targetUrl) return;
-    saveOverrideForUrl(targetUrl, override);
-    track("Tool Augmented", { tool: override.formId, url: targetUrl });
-    addHistory("tool_augmented", `${override.formId} on ${targetUrl}`);
-  }, [addHistory]);
-
-  const handleClearOverrides = useCallback((form: FormTool) => {
-    // Remove saved overrides for this form
-    const targetUrl = normalizeUrl(urlRef.current);
-    if (targetUrl) {
-      const all = loadAllOverrides();
-      const key = normalizeUrl(targetUrl);
-      if (all[key]) {
-        all[key] = all[key].filter((o) => o.formId !== form.formId);
-        if (all[key].length === 0) delete all[key];
-        saveAllOverrides(all);
-      }
-    }
-    // Clear each augmented attribute on the form by sending empty values
-    if (sessionRef.current) {
-      for (const attrName of ["toolname", "tooldescription", "toolautosubmit"]) {
-        sessionRef.current.sendMessage({
-          type: "webmcp:set-form-attr",
-          formIndex: form.index,
-          attrName,
-          attrValue: "",
-          isWebfuseApplied: false,
-        }, "*");
-      }
-      // Clear input-level attributes
-      for (const input of form.inputs) {
-        for (const attrName of ["toolparamtitle", "toolparamdescription"]) {
-          sessionRef.current.sendMessage({
-            type: "webmcp:set-input-attr",
-            formIndex: form.index,
-            inputIndex: input.index,
-            attrName,
-            attrValue: "",
-            isWebfuseApplied: false,
-          }, "*");
-        }
-      }
-      // Trigger a rescan so the form list refreshes
-      sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
-    }
-    track("Tool Cleared", { tool: form.toolname || form.formId, url: normalizeUrl(urlRef.current) });
-    addHistory("tool_cleared", `${form.toolname || form.formId} on ${normalizeUrl(urlRef.current)}`);
-  }, [addHistory]);
-
-  const handleExecuteTool = useCallback((toolName: string, args: Record<string, unknown>) => {
-    const requestId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    setExecutionResults((prev) => ({
-      ...prev,
-      [toolName]: { requestId, toolName, pending: true },
-    }));
-    sendToSession({
-      type: "webmcp:execute-tool",
-      requestId,
-      toolName,
-      args,
-    });
-    track("Tool Executed", { tool: toolName });
-    addHistory("tool_executed", `Executed ${toolName}`);
-  }, [sendToSession, addHistory]);
-
-  const restoreOverrides = useCallback((incomingForms: FormTool[]) => {
-    const targetUrl = normalizeUrl(urlRef.current);
-    if (!targetUrl) return;
-
-    const saved = getOverridesForUrl(targetUrl);
-    if (!saved.length) return;
-
-    const applyForms: Record<string, unknown>[] = [];
-    for (const override of saved) {
-      const liveForm = incomingForms.find((f) => f.formId === override.formId);
-      if (!liveForm) continue;
-
-      // Check if this form already has the overrides applied
-      const alreadyApplied = liveForm.webfuseApplied &&
-        Object.entries(override.attributes).every(
-          ([key, val]) => (liveForm as unknown as Record<string, string>)[key] === val
-        );
-      if (alreadyApplied) continue;
-
-      const formAttrs: Record<string, { value: string; webfuseApplied: boolean }> = {};
-      for (const [key, val] of Object.entries(override.attributes)) {
-        formAttrs[key] = { value: val, webfuseApplied: true };
-      }
-
-      const inputUpdates: Record<string, unknown>[] = [];
-      for (const [inputKey, attrs] of Object.entries(override.inputs)) {
-        const liveInput = liveForm.inputs.find(
-          (inp) => (inp.name || inp.id || `__idx_${inp.index}`) === inputKey
-        );
-        if (!liveInput) continue;
-        const inputAttrs: Record<string, { value: string; webfuseApplied: boolean }> = {};
-        for (const [key, val] of Object.entries(attrs)) {
-          inputAttrs[key] = { value: val, webfuseApplied: true };
-        }
-        inputUpdates.push({ index: liveInput.index, attributes: inputAttrs });
-      }
-
-      applyForms.push({
-        index: liveForm.index,
-        attributes: formAttrs,
-        inputs: inputUpdates,
-      });
-    }
-
-    if (applyForms.length) {
-      if (sessionRef.current) {
-        sessionRef.current.sendMessage({ type: "webmcp:apply-attrs", forms: applyForms }, "*");
-      }
-    }
-  }, []);
-
-  const handleConnect = useCallback(async () => {
-    if (!url.trim()) return;
-
-    let targetUrl = url.trim();
-    if (!/^https?:\/\//i.test(targetUrl)) {
-      targetUrl = "https://" + targetUrl;
-      setUrl(targetUrl);
-    }
-
-    if (!isValidDomain(targetUrl)) {
-      setUrlError("Please enter a valid domain (e.g. example.com)");
-      return;
-    }
-    setUrlError("");
-
-    addUrlToHistory(targetUrl);
-    setUrlHistory(loadUrlHistory());
-
-    // If we already have a running session, close existing tabs then open new one
-    if (connected && sessionRef.current) {
-      setForms([]);
-      setImperativeTools([]);
-      setSchemaResponse(null);
-      const tabs = await sessionRef.current.getTabs();
-      for (const tab of tabs) {
-        sessionRef.current.closeTab(tab.ssid);
-      }
-      sessionRef.current.openTab(targetUrl);
-      track("Tab Opened", { url: targetUrl });
-      addHistory("tab_opened", targetUrl);
-
-      // Request a scan after the new tab loads
-      setTimeout(() => {
-        if (sessionRef.current) {
-          sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
-        }
-      }, 1500);
-      return;
-    }
-
-    setConnecting(true);
-
-    try {
-      // Initialize space if not done yet
-      if (!spaceRef.current) {
-        spaceRef.current = await window.webfuse.initSpace(
-          WIDGET_KEY,
-          SPACE_ID
-        );
-      }
-
-      // Create session
-      const session = spaceRef.current.session();
-      sessionRef.current = session;
-
-      session.on("page_info", (...args: unknown[]) => {
-        console.log("page_info", ...args);
-        const info = args[0] as Record<string, unknown> | undefined;
-        if (info && typeof info.title === "string" && info.title) {
-          const pageUrl = normalizeUrl(urlRef.current);
-          if (pageUrl) {
-            savePageTitle(pageUrl, info.title);
-            setPageTitles(loadPageTitles());
-          }
-        }
-      });
-
-      session.on("session_ended", () => {
-        setConnected(false);
-        setConnecting(false);
-        setForms([]);
-        setImperativeTools([]);
-        sessionRef.current = null;
-        track("Disconnected");
-        addHistory("disconnected", "Session ended");
-      });
-
-      // Listen for messages from the extension
-      session.on("message", (...args: unknown[]) => {
-        let data: Record<string, unknown> | null = null;
-        for (const arg of args) {
-          if (!arg || typeof arg !== "object") continue;
-          const obj = arg as Record<string, unknown>;
-
-          if (typeof obj.type === "string" && obj.type.startsWith("webmcp:")) {
-            data = obj;
-            break;
-          }
-          if (obj.data && typeof obj.data === "object") {
-            const eventData = obj.data as Record<string, unknown>;
-            if (eventData.message && typeof eventData.message === "object") {
-              const msg = eventData.message as Record<string, unknown>;
-              if (typeof msg.type === "string" && msg.type.startsWith("webmcp:")) {
-                data = msg;
-                break;
-              }
-            }
-            if (typeof eventData.type === "string" && eventData.type.startsWith("webmcp:")) {
-              data = eventData;
-              break;
-            }
-          }
-        }
-
-        if (!data) return;
-
-        switch (data.type) {
-          case "webmcp:tools-update": {
-            const incomingForms = (data.forms as FormTool[]) || [];
-            const incomingImperative = (data.imperativeTools as ImperativeTool[]) || [];
-            setForms(incomingForms);
-            setImperativeTools(incomingImperative);
-            restoreOverrides(incomingForms);
-            const nativeMcp = incomingForms.filter((f) => f.hasWebMCP && !f.webfuseApplied).length;
-            const augmented = incomingForms.filter((f) => f.webfuseApplied).length;
-            const parts = [`${incomingForms.length} forms`, `${incomingImperative.length} imperative`];
-            if (nativeMcp > 0) parts.push(`${nativeMcp} native MCP`);
-            if (augmented > 0) parts.push(`${augmented} augmented`);
-            track("Tools Discovered", { forms: incomingForms.length, imperative: incomingImperative.length, url: urlRef.current });
-            addHistory("tools_discovered", `${urlRef.current} — ${parts.join(", ")}`);
-            break;
-          }
-          case "webmcp:schema":
-            setSchemaResponse(data as unknown as SchemaResponse);
-            break;
-          case "webmcp:execute-tool-result": {
-            const toolName = data.toolName as string;
-            const reqId = data.requestId as string;
-            setExecutionResults((prev) => ({
-              ...prev,
-              [toolName]: {
-                requestId: reqId,
-                toolName,
-                result: data.result,
-                error: data.error as string | undefined,
-                pending: false,
-              },
-            }));
-            // Resolve pending async callback
-            const cb = pendingCallbacks.current[reqId];
-            if (cb) {
-              delete pendingCallbacks.current[reqId];
-              if (data.error) {
-                cb.reject(new Error(data.error as string));
-              } else {
-                cb.resolve(data.result);
-              }
-            }
-            if (data.error) {
-              addHistory("tool_executed", `${toolName} failed: ${data.error}`);
-            } else {
-              addHistory("tool_executed", `${toolName} completed`);
-            }
-            break;
-          }
-        }
-      });
-
-      // Start session, then open tab via session_started global event
-      // (the session object from this event is the one with working openTab)
-      const openTabPromise = new Promise<void>((resolve) => {
-        window.webfuse.on("session_started", (startedSession: unknown) => {
-          const s = startedSession as WebfuseSession;
-          s.openTab(targetUrl);
-          resolve();
-        });
-      });
-
-      await session.start("#webfuse-container");
-
-      // Mark connected immediately after start resolves
-      setConnected(true);
-      setConnecting(false);
-      track("Connected", { url: targetUrl });
-      addHistory("connected", `Session started for ${targetUrl}`);
-
-      await openTabPromise;
-      track("Tab Opened", { url: targetUrl });
-      addHistory("tab_opened", targetUrl);
-
-      // Request a scan from the content script after the tab loads
-      setTimeout(() => {
-        if (sessionRef.current) {
-          sessionRef.current.sendMessage({ type: "webmcp:scan" }, "*");
-        }
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to start Webfuse session:", error);
-      setConnecting(false);
-    }
-  }, [url, connected, restoreOverrides]);
+  const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#0a0a0f]">
-      <Sidebar
-        url={url}
-        urlHistory={urlHistory}
-        pageTitles={pageTitles}
-        urlError={urlError}
-        onUrlChange={setUrl}
-        onConnect={handleConnect}
-        connected={connected}
-        connecting={connecting}
-        forms={forms}
-        imperativeTools={imperativeTools}
-        schemaResponse={schemaResponse}
-        sendToSession={sendToSession}
-        onSaveOverrides={handleSaveOverrides}
-        onClearOverrides={handleClearOverrides}
-        onExecuteTool={handleExecuteTool}
-        executionResults={executionResults}
-        executeToolAsync={executeToolAsync}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-      <MainContent connected={connected} connecting={connecting} history={history} />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg text-fg md:flex-row">
+      {sidebarOpen ? (
+        <aside className="flex h-[48vh] w-full flex-col overflow-hidden border-b border-line bg-panel md:h-auto md:w-[400px] md:min-w-[400px] md:border-b-0 md:border-r">
+          <header className="flex items-center gap-1 border-b border-line px-3 py-2">
+            <h1 className="flex-1 text-sm font-semibold">WebMCP Inspector</h1>
+            <button onClick={() => setPaletteOpen(true)} title="Commands (Ctrl+K)" className="rounded p-1.5 text-muted hover:bg-panel-2 hover:text-fg cursor-pointer">
+              <Search className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")}
+              title={`Theme: ${theme}`}
+              className="rounded p-1.5 text-muted hover:bg-panel-2 hover:text-fg cursor-pointer"
+            >
+              <ThemeIcon className="h-4 w-4" />
+            </button>
+            <a href={REPO_URL} target="_blank" rel="noopener noreferrer" title="Source on GitHub" className="rounded p-1.5 text-muted hover:bg-panel-2 hover:text-fg">
+              <Github className="h-4 w-4" />
+            </a>
+            <button onClick={() => setSidebarOpen(false)} title="Collapse" className="hidden rounded p-1.5 text-muted hover:bg-panel-2 hover:text-fg md:block cursor-pointer">
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </header>
+          <UrlBar inputRef={urlRef} />
+          {status === "live" && extension === "missing" && (
+            <div className="px-3 pt-2">
+              <Notice tone="warn" icon={<AlertTriangle className="h-3.5 w-3.5" />}>
+                The page is not answering. It may still be loading, or the Space may not have the inspector extension.
+              </Notice>
+            </div>
+          )}
+          <Tabs
+            className="border-b border-line px-1"
+            value={panel}
+            onChange={setPanel}
+            tabs={[
+              { id: "tools", label: "Tools", count: snapshot?.tools.length },
+              {
+                id: "ready",
+                label: (
+                  <span className="inline-flex items-center gap-1">
+                    Readiness
+                    {snapshot && (
+                      <span className={cx("rounded px-1 text-[10px] font-bold", report.score >= 75 ? "bg-ok-soft text-ok" : report.score >= 40 ? "bg-warn-soft text-warn" : "bg-err-soft text-err")}>
+                        {report.grade}
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+              { id: "agent", label: "Agent view" },
+              { id: "author", label: "Author" },
+              { id: "prompt", label: "Prompt" },
+            ]}
+          />
+          <div className={cx("min-h-0 flex-1", panel === "prompt" ? "flex flex-col" : "overflow-y-auto")}>
+            {panel === "tools" && <ToolsPanel snapshot={snapshot} />}
+            {panel === "ready" && <ReadinessPanel snapshot={snapshot} />}
+            {panel === "agent" && <AgentViewPanel snapshot={snapshot} onConnect={() => setAgentOpen(true)} />}
+            {panel === "author" && <AuthorPanel snapshot={snapshot} />}
+            {panel === "prompt" && (
+              <Suspense fallback={<p className="p-4 text-xs text-muted">Loading…</p>}>
+                <PromptPanel snapshot={snapshot} />
+              </Suspense>
+            )}
+          </div>
+          <footer className="hidden items-center justify-center gap-1.5 border-t border-line px-3 py-2 text-xs text-faint md:flex">
+            Powered by
+            <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-fg" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              Webfuse
+            </a>
+          </footer>
+        </aside>
+      ) : (
+        <aside className="hidden w-11 flex-col items-center gap-2 border-r border-line bg-panel py-2 md:flex">
+          <button onClick={() => setSidebarOpen(true)} title="Open the sidebar" className="rounded p-1.5 text-muted hover:bg-panel-2 hover:text-fg cursor-pointer">
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
+        </aside>
+      )}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative min-h-0 flex-1">
+          <iframe id="webfuse-container" className="h-full w-full border-0" title="Webfuse session" />
+          <SessionOverlay />
+          <ConnectAgent open={agentOpen} onOpenChange={setAgentOpen} />
+        </div>
+        <Dock />
+      </main>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={actions} />
     </div>
   );
 }

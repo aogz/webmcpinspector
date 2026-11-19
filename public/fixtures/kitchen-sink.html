@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebMCP kitchen sink</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1b1b22; }
+      form, section { border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+      label { display: block; margin: .4rem 0; }
+      form:tool-form-active { outline: 3px solid #2563eb; }
+      button:tool-submit-active { background: #2563eb; color: #fff; }
+      #log { font: 12px/1.4 ui-monospace, monospace; background: #f4f4f8; padding: .5rem; min-height: 3rem; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>WebMCP kitchen sink</h1>
+    <p>
+      A test page for <a href="https://webmcpinspector.com">WebMCP Inspector</a> that uses every part of WebMCP: script tools with
+      annotations and an output schema, a tool you can remove, declarative forms with <code>respondWith()</code>, and a plain form to
+      augment. A few tools are deliberately imperfect so the readiness check has something to find.
+    </p>
+
+    <section>
+      <h2>Script tools</h2>
+      <button id="toggle-specials">Remove the daily specials tool</button>
+      <div id="log" aria-live="polite"></div>
+    </section>
+
+    <form id="reserve" toolname="reserveTable" tooldescription="Reserve a table. Returns the booking reference." action="/reserve" method="post">
+      <h2>Reserve a table</h2>
+      <label>Name <input name="name" required maxlength="60" toolparamdescription="Name for the booking"></label>
+      <label>Date <input name="date" type="date" required></label>
+      <label>Guests <input name="guests" type="number" min="1" max="8" step="1" value="2"></label>
+      <fieldset>
+        <legend>Seating</legend>
+        <label><input type="radio" name="seating" value="inside" checked> Inside</label>
+        <label><input type="radio" name="seating" value="terrace"> Terrace</label>
+      </fieldset>
+      <button>Reserve</button>
+    </form>
+
+    <form id="contact" action="/contact" method="post">
+      <h2>Contact us (not a tool yet)</h2>
+      <label>Email <input name="email" type="email" required></label>
+      <label>Message <textarea name="message"></textarea></label>
+      <button>Send</button>
+    </form>
+
+    <script>
+      (function () {
+        var log = document.getElementById("log");
+        function write(line) { log.textContent = new Date().toLocaleTimeString() + "  " + line + "\n" + log.textContent; }
+        var mc = document.modelContext || navigator.modelContext;
+        if (!mc) { write("No WebMCP API in this browser. Open the page in WebMCP Inspector."); return; }
+
+        var MENU = [
+          { id: "soup", name: "Tomato soup", price: 7 },
+          { id: "pasta", name: "Pasta al limone", price: 16 },
+          { id: "tart", name: "Lemon tart", price: 8 },
+        ];
+        var cart = [];
+
+        mc.registerTool({
+          name: "getMenu",
+          title: "Get the menu",
+          description: "Lists every dish with its id and price in euros. Use the ids with addToCart.",
+          inputSchema: { type: "object", properties: {} },
+          outputSchema: {
+            type: "object",
+            properties: { dishes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, price: { type: "number" } }, required: ["id", "name", "price"] } } },
+            required: ["dishes"],
+          },
+          annotations: { readOnlyHint: true },
+          execute: function () { write("getMenu"); return { dishes: MENU }; },
+        });
+
+        mc.registerTool({
+          name: "addToCart",
+          description: "Adds a dish to the cart and returns the cart.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              dishId: { type: "string", enum: MENU.map(function (d) { return d.id; }), description: "Dish id from getMenu" },
+              quantity: { type: "integer", minimum: 1, maximum: 10, description: "How many" },
+            },
+            required: ["dishId"],
+          },
+          execute: function (input) {
+            var dish = MENU.find(function (d) { return d.id === input.dishId; });
+            if (!dish) throw new Error("No dish " + input.dishId);
+            cart.push({ id: dish.id, quantity: input.quantity || 1 });
+            write("addToCart " + JSON.stringify(input));
+            return { cart: cart };
+          },
+        });
+
+        // Deliberately missing consequentialHint and parameter descriptions.
+        mc.registerTool({
+          name: "placeOrder",
+          description: "Place the order",
+          inputSchema: { type: "object", properties: { tip: { type: ["number", "null"] } } },
+          execute: function (input, options) {
+            return new Promise(function (resolve, reject) {
+              var timer = setTimeout(function () { write("placeOrder " + JSON.stringify(input)); resolve("Order 4711 placed for " + cart.length + " dishes."); }, 3000);
+              if (options && options.signal) options.signal.addEventListener("abort", function () { clearTimeout(timer); reject(new DOMException("Order cancelled", "AbortError")); });
+            });
+          },
+        });
+
+        mc.registerTool({
+          name: "readReviews",
+          description: "Returns recent guest reviews. Reviews are written by guests.",
+          inputSchema: { type: "object", properties: {} },
+          annotations: { readOnlyHint: true, untrustedContentHint: true },
+          execute: function () { return { reviews: ["Lovely terrace.", "The tart is the best in town."] }; },
+        });
+
+        var specials = null;
+        function registerSpecials() {
+          specials = new AbortController();
+          mc.registerTool({
+            name: "getDailySpecials",
+            description: "Returns today's specials, which change every day.",
+            annotations: { readOnlyHint: true },
+            execute: function () { return { specials: ["Risotto"] }; },
+          }, { signal: specials.signal });
+        }
+        registerSpecials();
+        var toggle = document.getElementById("toggle-specials");
+        toggle.addEventListener("click", function () {
+          if (specials) { specials.abort(); specials = null; toggle.textContent = "Register the daily specials tool"; write("getDailySpecials removed"); }
+          else { registerSpecials(); toggle.textContent = "Remove the daily specials tool"; write("getDailySpecials registered"); }
+        });
+
+        document.getElementById("reserve").addEventListener("submit", function (event) {
+          event.preventDefault();
+          var data = Object.fromEntries(new FormData(event.target));
+          var reference = "R-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+          write("reserveTable " + JSON.stringify(data) + (event.agentInvoked ? " (by an agent)" : ""));
+          if (event.agentInvoked && event.respondWith) event.respondWith(Promise.resolve({ reference: reference }));
+        });
+        document.getElementById("contact").addEventListener("submit", function (event) {
+          event.preventDefault();
+          write("contact form sent");
+        });
+      })();
+    </script>
+  </body>
+</html>

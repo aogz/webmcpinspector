@@ -226,7 +226,7 @@
 
       <p class="subtitle">
         Discover, inspect, and debug both declarative (HTML form) and imperative (JS API) tools exposed via the
-        <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener noreferrer">WebMCP</a> spec. Execute tools, augment forms, and test with Chrome's on-device Gemini Nano model &mdash; all in real time.
+        <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener noreferrer">WebMCP</a> spec. Run tools, grade how ready a page is for agents, see what agents receive over MCP, and hand the live page to Claude, Codex or Cursor in one click &mdash; in any browser, no flags.
       </p>
 
       <a class="cta" href="/inspect/">
@@ -238,19 +238,19 @@
       <div class="features">
         <div class="feature">
           <h3>Declarative Tools <span class="badge badge-blue">HTML</span></h3>
-          <p>Scans pages for HTML forms annotated with WebMCP attributes like toolname, tooldescription, and parameter metadata.</p>
+          <p>Reads forms annotated with <code>toolname</code>, <code>tooldescription</code> and <code>toolparamdescription</code>, with the schema the browser derives from them.</p>
         </div>
         <div class="feature">
           <h3>Imperative Tools <span class="badge badge-purple">JS API</span></h3>
-          <p>Detects tools registered via the <code>navigator.modelContext</code> JavaScript API, with full input schema support.</p>
+          <p>Lists tools registered with <code>document.modelContext.registerTool()</code>: titles, annotations, input and output schemas, and when they are added or removed.</p>
         </div>
         <div class="feature">
           <h3>Augment Forms</h3>
-          <p>Turn any plain HTML form into a WebMCP tool by adding metadata. Overrides are saved per URL and restored automatically.</p>
+          <p>Turn any form into a tool, or write a script tool and register it in the live page. Export the markup, the code, or a Webfuse extension.</p>
         </div>
         <div class="feature">
-          <h3>Inspect &amp; Validate</h3>
-          <p>View generated JSON schemas, validate WebMCP attributes, and highlight forms directly on the target page.</p>
+          <h3>Readiness Score</h3>
+          <p>Checks names, descriptions, schemas, safety hints and hidden characters, and shows what MCP bridges drop. Share the report or a badge.</p>
         </div>
       </div>
 
@@ -258,15 +258,15 @@
       <div class="features three-col">
         <div class="feature">
           <h3>Execute Tools</h3>
-          <p>Call any discovered tool directly from the inspector with parameter inputs, and view results in real time.</p>
+          <p>Call any tool with schema-aware arguments, cancel it mid-call, replay it, and diff results against the output schema.</p>
         </div>
         <div class="feature">
-          <h3>On-Device AI <span class="badge badge-green">Gemini Nano</span></h3>
-          <p>Debug tools with Chrome's built-in Gemini Nano model. The on-device agent can autonomously discover and call tools.</p>
+          <h3>Prompt Debugger <span class="badge badge-green">Evals</span></h3>
+          <p>Let Gemini Nano, Claude, OpenAI or Gemini use the tools, run evals on which tool a model picks, and test prompt injection through tool results.</p>
         </div>
         <div class="feature">
-          <h3>Activity Log</h3>
-          <p>Real-time history of tool discovery, augmentation, execution results, and tab navigation events.</p>
+          <h3>Connect Your Agent</h3>
+          <p>One click opens Claude Desktop, Claude Code, Codex, Cursor or Zed with a prompt that connects them to the live page over MCP.</p>
         </div>
       </div>
 
@@ -278,7 +278,7 @@
         </div>
         <div class="feature">
           <h3>Works on Any Page</h3>
-          <p>Enter any URL to inspect it. No browser extension required &mdash; everything runs through a secure Webfuse session.</p>
+          <p>Enter any URL. Webfuse gives the page WebMCP even where the browser has none, so there is nothing to install and no flag to set.</p>
         </div>
       </div>
 
