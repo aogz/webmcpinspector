@@ -2,67 +2,119 @@
 
 Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools of any web page, then hand the live page to your own agent.
 
-The page opens in a [Webfuse](https://www.webfuse.com) session next to the inspector. Webfuse gives every page `document.modelContext`, so this works in any browser, with no extension to install and no Chrome flag to set.
+The page opens in a [Webfuse](https://www.webfuse.com) session next to the inspector, so there is nothing to install. In browsers without built-in WebMCP, Webfuse gives the page `document.modelContext` through its polyfill.
 
 ![WebMCP Inspector screenshot](./public/webmcpinspector.png)
 
-Live: [webmcpinspector.com](https://webmcpinspector.com) · Test page with every WebMCP feature: [`/inspect/fixtures/kitchen-sink.html`](https://webmcpinspector.com/inspect/fixtures/kitchen-sink.html)
+Live: [webmcpinspector.com](https://webmcpinspector.com) · Test page that uses every WebMCP feature: [`kitchen-sink.html`](https://webmcpinspector.com/inspect/fixtures/kitchen-sink.html)
+
+## Status
+
+Version 2.0.0, rebuilt in November 2026 for the current WebMCP spec (`document.modelContext`, `getTools()` / `executeTool()`, `AbortSignal` removal, `outputSchema`, the four tool annotations).
+
+### What works where
+
+| Browser | Form tools | Script tools |
+| :- | :- | :- |
+| Without built-in WebMCP (Firefox, Safari, Chrome without WebMCP) | Yes | Yes, through the Webfuse polyfill |
+| Chrome with built-in WebMCP (for example Chrome 151) | Yes | **Not yet.** See below |
+
+Chrome only lets a page in an iframe use its WebMCP when every parent frame grants the `tools` permission (`allow="tools"`). Webfuse's frames don't grant it yet, and Webfuse skips its polyfill when the browser has its own WebMCP. Chrome then rejects every `registerTool()` call with `NotAllowedError`, so pages that declare their tools from script show none. The Tools panel and the readiness report say so when it happens. A fix in Webfuse is in progress.
+
+### Known limitations
+
+- **Connect your agent** needs the **Automation** app in the Webfuse Space, and the Space's Automation key in `VITE_AUTOMATION_KEY` at build time. Without the app, agents cannot reach the session. Without the key, each visitor has to paste one.
+- **Only the top frame is read.** Tools registered inside iframes are listed as frames, not as tools.
+- **Script tools you add** in the Author panel run through `new Function()`, so pages whose Content Security Policy forbids `eval` refuse them. The inspector shows the error.
+- **Form tools return an acknowledgement**, not the page's response, unless the page answers with `SubmitEvent.respondWith()`.
+- **Gemini Nano** needs desktop Chrome 148 or later on supported hardware. Its built-in tool calling is still behind `chrome://flags/#prompt-api-tool-use`, so the text protocol is the default.
+- **Model names** for OpenAI and Gemini are editable defaults (`gpt-5`, `gemini-3.6-flash`), not a maintained list.
 
 ## Features
 
-### Tools
-- **Script tools** registered with `document.modelContext.registerTool()`, with their title, annotations (`readOnlyHint`, `consequentialHint`, `untrustedContentHint`, `debugging`), input and output schemas, and `exposedTo`.
-- **Form tools** declared with `toolname`, `tooldescription`, `toolautosubmit` and `toolparamdescription`. The schema shown is the one the browser derives, or the inspector's estimate if the browser does not list the form.
-- **Live updates.** The list follows `toolchange`, tools removed by aborting their `AbortSignal`, `toolactivated`/`toolcancel`, and `SubmitEvent.agentInvoked` with `respondWith()`.
-- **Where WebMCP comes from:** native, or the Webfuse polyfill. Tools registered on the old `navigator.modelContext` are flagged.
+### Tools panel
+- **Script tools** from `document.modelContext.registerTool()`, with title, description, annotations (`readOnlyHint`, `consequentialHint`, `untrustedContentHint`, `debugging`), input and output schemas, and `exposedTo`.
+- **Form tools** declared with `toolname`, `tooldescription`, `toolautosubmit` and `toolparamdescription`. The schema shown is the one the browser derives, or the inspector's estimate when the browser does not list the form. The estimate covers radio groups, checkbox groups, multi-selects, formats, lengths, patterns and number ranges.
+- **Other forms** on the page, ready to be turned into tools.
+- **Where WebMCP comes from:** the browser's own or the Webfuse polyfill, and whether the frame may use it.
+- **Live updates:** the list follows `toolchange`, tools removed by aborting their `AbortSignal`, and DOM changes to forms.
+- **Legacy API:** tools registered on the old `navigator.modelContext` are flagged.
+- **Locate:** scrolls to a form on the page and outlines it. A scan marks the page's tool forms without moving the page.
+- **Filter** tools and forms by name or description.
 
 ### Running tools
-- A form built from the schema, including nested objects, arrays and enums. It also has a JSON mode and an "example" button that fills every field.
-- Inputs are checked against the input schema, and results against the output schema.
-- Calls can be cancelled, which aborts the tool's `signal`, and each call has a timeout you set.
-- Every call is recorded in a history. You can replay a call, or diff it with the previous call to the same tool.
+- **Argument editor** built from the schema, including nested objects, arrays, enums, booleans and date, email and URL fields. It also has a JSON mode and an **Example** button that fills every field from the schema.
+- **Validation:** arguments are checked against the input schema, and results against the output schema.
+- **Cancel and timeout:** **Cancel** aborts the tool's `signal`. The timeout is adjustable from 5 to 120 seconds.
+- **Warnings:** tools marked `consequentialHint` show a warning that the call acts on the real site.
+- **Results** show the value, the duration and which API ran the call (`executeTool()`, the testing API, the tool's own `execute()`, or the inspector filling the form).
+- **Form filling** works with React and other frameworks, and submits only when `toolautosubmit` allows it.
 
 ### Readiness
-A score from A to F, with findings for:
-- names: invalid, reserved by Webfuse, or duplicated;
-- descriptions: missing, too short or too long, invisible Unicode, or text that reads like instructions to the agent;
-- schemas: invalid, a non-object input schema, or undocumented parameters;
-- safety hints: a tool that looks consequential but has no `consequentialHint`, or `readOnlyHint` that contradicts the tool;
-- forms: radio groups without a description, the obsolete `toolparamtitle`, and `toolautosubmit` on POST forms;
-- cross-origin iframes without `allow="tools"`.
+A score from 0 to 100 and a grade from A to F, from 35 checks:
+- **names:** invalid, starting with something other than a letter, reserved by Webfuse, or duplicated, including a script tool that hides a form tool of the same name;
+- **descriptions:** missing, too short or too long, containing invisible or direction-changing Unicode, or reading like instructions to the agent;
+- **schemas:** invalid, a non-object input schema, untyped or undocumented parameters, `null` type unions, and a missing or invalid output schema;
+- **safety hints:** a tool that looks consequential without `consequentialHint`, and `readOnlyHint` that contradicts the tool or is combined with `consequentialHint`;
+- **forms:**
+  - a `toolname` without `tooldescription`;
+  - fields without a name or a description;
+  - radio groups without a description;
+  - the obsolete `toolparamtitle`;
+  - `toolautosubmit` on a POST form;
+  - no submit button;
+  - forms the browser does not register;
+- **the page:** forms not exposed as tools, cross-origin iframes without `allow="tools"`, no WebMCP API at all, and a blocked `tools` permission.
 
-You can copy the report as Markdown, or a badge as SVG.
+Copy the report as Markdown, or a "WebMCP ready" badge as SVG.
 
 ### Agent view
 Shows each tool as the page registered it, next to the copy an MCP client receives from the Webfuse Session MCP Server. The server:
-- adds a `session_id` parameter;
+- adds a required `session_id` parameter;
 - prefixes each description to mark it as page-declared and untrusted;
 - removes `null` from type unions;
-- drops hints that MCP has no field for;
-- leaves out tools that have reserved names or invalid schemas.
+- drops the title, the output schema and the hints MCP has no field for;
+- leaves out tools with reserved or invalid names and tools whose input schema is not an object.
 
 ### Connect your agent
-One button opens Claude Desktop, Claude Code, Codex, Cursor or Zed with a prompt already filled in. The prompt connects the agent to this exact session over MCP in dynamic mode, which is the mode that lists the page's own tools, and tells it to call those tools. **Copy prompt** works for any other agent.
+One button opens Claude Desktop, Claude Code, Codex, Cursor or Zed with a prompt already filled in. **Copy prompt** works for any other agent. Nothing is sent until you press Enter in the app.
+
+The prompt contains:
+- the session ID and the page URL;
+- the MCP server in dynamic mode, which is the mode that lists the page's own tools;
+- the setup line for that agent;
+- an HTTP fallback for agents that only load MCP servers at startup.
+
+It suggests a first task from the page's tools. It also tells the agent to call `connectToSession` first, to prefer the page's tools, and to treat their output as untrusted.
 
 The links are the same intent links as the [Webfuse agent playground](https://playground.x.aogz.me).
 
 ### Author and export
-- **Script tools:** write a tool (name, schemas, annotations, `execute` body) and register it in the live page. It is kept per page and comes back on every visit.
-- **Form augmentation:** turn any form into a tool, or fix the descriptions of one that already is.
-- **Export:** the form markup, a `registerTool()` snippet with feature detection, or a Webfuse extension (`manifest.json` and `content.js`) that applies your changes for every visitor of a Space.
+- **Script tools:** write a tool (name, title, description, input and output schemas, annotations, `execute` body) and register it in the live page. Tools are saved per page and come back on every visit. You can switch them off, edit or delete them.
+- **Form augmentation:** turn any form into a tool, or fix the attributes of one that already is. Changes are saved per page in your browser and reapplied when the page loads.
+- **Export:**
+  - the form markup to add to the site;
+  - a `registerTool()` snippet with feature detection;
+  - a Webfuse extension (`manifest.json` and `content.js`) that applies your form changes and script tools for every visitor of a Space, without changing the site.
 
 ### Prompt debugger
-- **Models:** Gemini Nano on the device (Chrome 148 or later), Claude (Opus 5.5, Sonnet 5.5 or Haiku 5.5), OpenAI or Gemini, each with your own API key.
-- **Chat:** the model uses the page's tools. Tools with `consequentialHint` ask you before they run.
-- **Evals:** each case pairs a request with the tool and arguments it should produce. The inspector checks what the model calls without running the tool. You can import and export the cases.
+- **Models:** Gemini Nano on the device, Claude (Opus 5.5, Sonnet 5.5 or Haiku 5.5), OpenAI or Gemini. API providers use your own key, which stays in your browser and goes only to that provider. Claude calls use server-side refusal fallbacks (`fallbacks: "default"`).
+- **Chat:** the model uses the page's tools, and you see every call and result. Tools with `consequentialHint` ask you before they run.
+- **Evals:** each case pairs a request with the tool and arguments it should produce. The inspector records what the model calls without running the tool, and reports passes. You can import and export the cases.
 - **Injection test:** appends hostile text to each tool result and reports whether the model followed it.
 
-API keys stay in your browser and go only to the provider you pick. Claude calls use server-side refusal fallbacks (`fallbacks: "default"`).
+### Activity and calls
+- **Activity log:** session events, tool discovery, registrations and removals, `toolactivated` / `toolcancel`, agent submissions and `respondWith()`, augmentations and errors. Filter by kind, expand an entry for details, export as JSON.
+- **Calls:** every call from the sidebar, the prompt debugger and evals. Replay any call, diff its result with the previous call to the same tool, or export them all.
+- **Copy report:** page, WebMCP implementation, browser, tools, recent calls and activity as Markdown, ready to paste into a bug report.
 
 ### Workflow
-- Light and dark themes, which follow the system unless you choose one.
-- A command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>), plus <kbd>/</kbd> to jump to the URL bar and <kbd>R</kbd> to scan again.
-- An activity log with filters, JSON export and a "copy report" button for bug reports.
+- **URL bar:** remembers recent pages with their titles, and refuses `localhost` URLs, which Webfuse cannot reach.
+- **Themes:** light and dark, following the system unless you choose one.
+- **Keyboard:** a command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>) for every panel and tool, <kbd>/</kbd> to jump to the URL bar and <kbd>R</kbd> to scan again.
+- **Layout:** a collapsible sidebar, and a stacked layout on narrow screens.
+- **Version check:** the inspector notices when the Space runs an older extension.
+- **Privacy:** analytics receive only the inspected page's host name, never its full URL.
 
 ## Getting Started
 
@@ -84,32 +136,43 @@ The settings live in `.env`. Without one, the app uses the public webmcpinspecto
 
 | Variable | What it does |
 | :- | :- |
-| `VITE_WIDGET_KEY`, `VITE_SPACE_ID` | Webfuse widget key and Space. The Space needs the **Automation** app and this repository's extension. |
-| `VITE_AUTOMATION_KEY` | The Space's Automation key (`ak_…`), used by Connect your agent. Anyone who opens the inspector can read it, so use a Space made for this. If you leave it empty, visitors paste their own. |
+| `VITE_WIDGET_KEY`, `VITE_SPACE_ID` | Webfuse widget key and Space. The Space needs this repository's extension, and the **Automation** app for Connect your agent. |
+| `VITE_AUTOMATION_KEY` | The Space's Automation key (`ak_…`), used by Connect your agent for every visitor. Find it in Webfuse Studio on the Space's **Developers** page, under **API**; installing the Automation app creates it. Never commit it: set it in `.env` or as a build argument. Vite builds it into the page, so anyone who opens the inspector can read it; use a Space made for this. If you leave it empty, visitors paste their own. |
 | `VITE_MCP_URL` | Session MCP endpoint, when it is not `https://session-mcp.<session host>/mcp`. |
+
+All `VITE_*` values are read when the app is built, not when it runs, so changing one means building again.
 
 The `VITE_WIDGET_KEY_DEV` and `VITE_SPACE_ID_DEV` names from version 1 still work in `npm run dev`.
 
+The Space's frame ancestors list must include the host the inspector runs on. A host given without a port only matches the default port, so `127.0.0.1` does not cover `127.0.0.1:5173`.
+
 ### The Webfuse extension
 
-The inspector reads the page through a small Webfuse extension, `src/extension/`. Build it with:
+The inspector reads the page through a small Webfuse extension in `src/extension/`. Build it with:
 
 ```bash
 npm run build:extension
 ```
 
-Then upload `dist/extension` (`manifest.json` and `content.js`) to the Space in Webfuse Studio. While you work on it, `npm run dev:extension` rebuilds it on every change.
+Then update the extension in the Space with `dist/extension` (`manifest.json` and `content.js`). In Webfuse Studio, open the Space, choose **Manage** under Extensions, select the extension and use **Refresh extension**. `npm run dev:extension` rebuilds it on every change.
 
-The app and the extension speak a versioned protocol (`src/shared/protocol.ts`). If the Space runs an older extension, the inspector tells you to upload the new one.
+The build uses the widget key and Space from `.env`, so build without a `.env` (or with production values) for the public Space.
+
+The app and the extension speak a versioned protocol (`src/shared/protocol.ts`). If the Space runs an older extension, the inspector asks you to upload the new one.
 
 ### Scripts
 
 | Command | What it does |
 | :- | :- |
 | `npm run dev` | Development server for the app |
+| `npm run dev:extension` | Rebuilds the extension on every change |
 | `npm run build` | Typecheck, then build the app and the extension into `dist/` |
-| `npm test` | Unit tests, plus an integration test of the content script in happy-dom |
+| `npm run build:extension` | Build only the extension |
+| `npm test` | Unit tests, panel render tests, and an integration test of the content script in happy-dom |
 | `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript |
+
+CI (`.github/workflows/ci.yml`) runs lint, tests and the build on every push and pull request, and keeps the built extension as an artifact.
 
 ### Docker
 
@@ -118,7 +181,11 @@ docker build -t webmcp-inspector --build-arg VITE_AUTOMATION_KEY=ak_… .
 docker run -p 8080:80 webmcp-inspector
 ```
 
-The app is served at `/inspect/`, the landing page at `/`, and a health check at `/healthz`.
+The build also accepts `VITE_WIDGET_KEY`, `VITE_SPACE_ID` and `VITE_MCP_URL` as build arguments. It runs the tests before building.
+
+On Dokploy, set these under the application's **Environment → Build-time Arguments**, not as runtime environment variables, then redeploy. A runtime variable never reaches the built page.
+
+The app is served at `/inspect/`, the landing page at `/`, and a health check at `/healthz`. The image's `HEALTHCHECK` calls `/healthz` on `127.0.0.1`. Orchestrators such as Docker Swarm only switch traffic to a new container once that check passes.
 
 ## Project Structure
 
@@ -130,18 +197,23 @@ src/
     store.ts              Session, messaging, calls, persistence (useSyncExternalStore)
     agentLinks.ts         Intent links and prompts for Connect your agent
     exporters.ts          HTML, registerTool() and Webfuse extension exports
+    report.ts             The "Copy report" text
     storage.ts            localStorage, with migration of version 1 data
     llm/                  Gemini Nano, Claude, OpenAI and Gemini providers
-  components/             Panels: Tools, Readiness, Agent view, Author, Prompt; Dock; Connect your agent
+  components/             Panels (Tools, Readiness, Agent view, Author, Prompt), Dock,
+                          Connect your agent, URL bar, command palette, argument editor
   extension/
     content.ts            Runs in the page: reads tools and forms, runs calls, applies changes
     forms.ts              Form keys, fields, schema estimate, filling forms the way a user would
     overlay.ts            Highlights on the page
   shared/
     protocol.ts           Messages between the app and the extension
-    lint.ts               Readiness rules and score
+    types.ts              Snapshot, tool, form and call types
+    lint.ts               Readiness checks and score
     agentView.ts          How the Webfuse Session MCP Server translates page tools
+    webfuse.ts            Webfuse's reserved tool names and name rules
     jsonSchema.ts         Validation, schema checks, example values
+  __tests__/              Vitest suites
 public/
   extension/manifest.json
   fixtures/kitchen-sink.html
