@@ -103,6 +103,8 @@ export interface RuntimeInfo {
   hasExecuteTool: boolean;
   hasTestingApi: boolean;
   legacyNavigatorApi: boolean;
+  /** False when the frame's permissions policy disallows the `tools` feature, so native WebMCP rejects every call. */
+  toolsAllowed?: boolean;
   userAgent: string;
 }
 

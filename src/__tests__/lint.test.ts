@@ -82,6 +82,12 @@ describe("lintSnapshot", () => {
     );
   });
 
+  it("explains a blocked tools permissions policy", () => {
+    const s = snapshot([tool({})]);
+    s.runtime.toolsAllowed = false;
+    expect(rules(s)).toContain("tools-policy-blocked");
+  });
+
   it("checks declarative forms", () => {
     const form: FormInfo = {
       key: "#book",

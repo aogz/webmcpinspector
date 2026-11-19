@@ -280,6 +280,15 @@ function RuntimeNotice({ runtime }: { runtime: RuntimeInfo }) {
       : runtime.implementation === "webfuse-polyfill"
         ? "Webfuse's WebMCP polyfill, so no browser flag is needed"
         : "an unknown implementation";
+  if (runtime.toolsAllowed === false) {
+    return (
+      <Notice tone="warn" icon={<AlertTriangle className="h-3.5 w-3.5" />}>
+        This browser has its own WebMCP, but the page's frame is not allowed to use it (the <code>tools</code> permissions policy is
+        off), so the page cannot register script tools here. Only forms are shown. Until Webfuse delegates <code>tools</code> to
+        its frames, use a browser without native WebMCP, where Webfuse's polyfill takes over.
+      </Notice>
+    );
+  }
   if (runtime.api === "none") {
     return (
       <Notice tone="warn" icon={<AlertTriangle className="h-3.5 w-3.5" />}>

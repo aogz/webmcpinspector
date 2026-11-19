@@ -359,6 +359,13 @@ export function lintSnapshot(snapshot: PageSnapshot | null): Report {
       message: `${closedFrames.length} cross-origin iframe${closedFrames.length > 1 ? "s" : ""} without allow="tools". Their tools stay private to the frame.`,
     });
   }
+  if (snapshot.runtime.toolsAllowed === false) {
+    findings.push({
+      rule: "tools-policy-blocked",
+      severity: "info",
+      message: "The tools permissions policy is off in this frame, so script tools could not register. The score covers forms only.",
+    });
+  }
   if (snapshot.runtime.api === "none") {
     findings.push({
       rule: "no-runtime",

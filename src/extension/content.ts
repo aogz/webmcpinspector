@@ -228,6 +228,20 @@ function annotationsOf(entry: RegisteredLike | undefined, source: ToolDescriptor
   return out;
 }
 
+interface PolicyLike {
+  allowsFeature?: (feature: string) => boolean;
+}
+
+function toolsAllowed(): boolean | undefined {
+  const d = document as unknown as { permissionsPolicy?: PolicyLike; featurePolicy?: PolicyLike };
+  const policy = d.permissionsPolicy ?? d.featurePolicy;
+  try {
+    return typeof policy?.allowsFeature === "function" ? policy.allowsFeature("tools") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function runtimeInfo(): RuntimeInfo {
   const doc = docMc();
   const nav = navMc();
@@ -239,6 +253,7 @@ function runtimeInfo(): RuntimeInfo {
     hasExecuteTool: typeof doc?.executeTool === "function",
     hasTestingApi: !!testing(),
     legacyNavigatorApi: !!nav && nav !== doc,
+    toolsAllowed: runtimeNative ? toolsAllowed() : undefined,
     userAgent: navigator.userAgent,
   };
 }
