@@ -12,6 +12,7 @@ import ToolsPanel from "./components/ToolsPanel";
 import { Notice, Tabs } from "./components/ui";
 import { cx } from "./components/uiUtils";
 import UrlBar from "./components/UrlBar";
+import WebfuseLogo from "./components/WebfuseLogo";
 import { REPO_URL } from "./config";
 import { lintSnapshot } from "./shared/lint";
 import { inspectLink } from "./app/shareLink";
@@ -216,8 +217,8 @@ export default function App() {
           </div>
           <footer className="hidden items-center justify-center gap-1.5 border-t border-line px-3 py-2 text-xs text-faint md:flex">
             Powered by
-            <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-fg" style={{ fontFamily: "'Manrope', sans-serif" }}>
-              Webfuse
+            <a href="https://www.webfuse.com" target="_blank" rel="noopener noreferrer" className="inline-flex text-fg hover:opacity-80">
+              <WebfuseLogo className="h-4 w-auto" />
             </a>
           </footer>
         </aside>
