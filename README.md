@@ -2,7 +2,7 @@
 
 Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools of any web page: run them, let models use them in a prompt debugger, check with evals that a model picks the right tool, and hand the live page to your own agent.
 
-The page opens in a [Webfuse](https://www.webfuse.com) session next to the inspector, so there is nothing to install. In browsers without built-in WebMCP, Webfuse gives the page `document.modelContext` through its polyfill.
+The page opens in a [Webfuse](https://www.webfuse.com) session embedded right next to the inspector, so there is nothing to install. The page uses the browser's own WebMCP where it has one (Chrome), and Webfuse's polyfill everywhere else.
 
 ![WebMCP Inspector screenshot](./public/webmcpinspector.png)
 
@@ -16,14 +16,34 @@ Version 2.0.0, rebuilt in November 2026 for the current WebMCP spec (`document.m
 
 | Browser | Form tools | Script tools |
 | :- | :- | :- |
+| Chrome with built-in WebMCP (for example Chrome 151) | Yes | Yes, through Chrome's own WebMCP |
 | Without built-in WebMCP (Firefox, Safari, Chrome without WebMCP) | Yes | Yes, through the Webfuse polyfill |
-| Chrome with built-in WebMCP (for example Chrome 151) | Yes | **Not yet.** See below |
 
-Chrome only lets a page in an iframe use its WebMCP when every parent frame grants the `tools` permission (`allow="tools"`). Webfuse's frames don't grant it yet, and Webfuse skips its polyfill when the browser has its own WebMCP. Chrome then rejects every `registerTool()` call with `NotAllowedError`, so pages that declare their tools from script show none. The Tools panel and the Score panel say so when it happens. A fix in Webfuse is in progress.
+If a browser ever blocks WebMCP in the session's frame, the Tools panel and the Score panel say so, and only form tools are listed.
+
+### How the session is embedded
+
+The inspector loads the Space link (`VITE_SPACE_URL`, by default `https://webfu.se/+webmcpinspector/`) straight into its own iframe. Opening a Space link starts a new session, so the inspector does not use the Webfuse widget.
+
+This matters for Chrome. Chrome only lets a page inside frames use its built-in WebMCP when every frame above it grants the `tools` permission. The widget creates the session frame itself, and its `allow` list has no `tools`, so Chrome rejects every `registerTool()` call and pages that declare tools from script show none. Because the inspector owns its iframe, it sets the list itself:
+
+```html
+<iframe src="https://webfu.se/+webmcpinspector/"
+        allow="tools *; clipboard-read; clipboard-write; fullscreen; microphone; camera; display-capture; encrypted-media; autoplay">
+```
+
+The inspector then drives the session over the same `postMessage` API the widget uses (`src/app/sessionFrame.ts`):
+
+- **Commands** go to the session frame as `api_request` messages: `get_session_info`, `get_session_tabs`, `open_tab`, `relocate_tab`, `activate_tab`, `close_tab` and `end`.
+- **Messages for the extension** inside the page go as `widget_message` with `target: "user"`, and the extension's replies come back the same way.
+- **Session events** such as `tab_relocated`, `tab_opened` and `session_ended` arrive as `widget_event` and `cobro_event` messages.
+
+Only the extension inside the page still uses the widget API (`webfuse.currentSession`), which is why it needs the Space's widget key and ID.
 
 ### Known limitations
 
 - **Connect your agent** needs the **Automation** app in the Webfuse Space, and the Space's Automation key in `VITE_AUTOMATION_KEY` at build time. Without the app, agents cannot reach the session. Without the key, each visitor has to paste one.
+- **The session's `postMessage` API is internal to Webfuse.** It is the one the Webfuse widget uses, not a documented public API, so a Webfuse update could change it.
 - **Only the top frame is read.** Tools registered inside iframes are listed as frames, not as tools.
 - **Script tools you add** in the Build panel run through `new Function()`, so pages whose Content Security Policy forbids `eval` refuse them. The inspector shows the error.
 - **Form tools return an acknowledgement**, not the page's response, unless the page answers with `SubmitEvent.respondWith()`.
@@ -148,7 +168,7 @@ All `VITE_*` values are read when the app is built, not when it runs, so changin
 
 The `VITE_SPACE_URL_DEV`, `VITE_WIDGET_KEY_DEV` and `VITE_SPACE_ID_DEV` names also work in `npm run dev`.
 
-The inspector embeds the Space link in its own iframe instead of using the Webfuse widget. That lets it grant the iframe the `tools` permission, which Chrome requires before a page in a frame may use its built-in WebMCP. The session is driven over the same `postMessage` API the widget uses.
+The inspector embeds the Space link instead of using the Webfuse widget; see [How the session is embedded](#how-the-session-is-embedded).
 
 The Space's frame ancestors list must include the host the inspector runs on. A host given without a port only matches the default port, so `127.0.0.1` does not cover `127.0.0.1:5173`.
 
@@ -201,6 +221,7 @@ src/
   config.ts               Keys and endpoints from the environment
   app/
     store.ts              Session, messaging, calls, persistence (useSyncExternalStore)
+    sessionFrame.ts       Embeds the Space link and drives the session over postMessage
     agentLinks.ts         Intent links and prompts for Connect your agent
     exporters.ts          HTML, registerTool() and Webfuse extension exports
     report.ts             The "Copy report" text
