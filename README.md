@@ -139,13 +139,16 @@ The settings live in `.env`. Without one, the app uses the public webmcpinspecto
 
 | Variable | What it does |
 | :- | :- |
-| `VITE_WIDGET_KEY`, `VITE_SPACE_ID` | Webfuse widget key and Space. The Space needs this repository's extension, and the **Automation** app for Connect your agent. |
+| `VITE_SPACE_URL` | The Space link the inspector embeds, such as `https://webfu.se/+webmcpinspector/`. Opening it starts a new session. The Space needs this repository's extension, and the **Automation** app for Connect your agent. |
+| `VITE_WIDGET_KEY`, `VITE_SPACE_ID` | The same Space's widget key and ID. Only the extension uses them, inside the page; the app itself does not load the Webfuse widget. |
 | `VITE_AUTOMATION_KEY` | The Space's Automation key (`ak_…`), used by Connect your agent for every visitor. Find it in Webfuse Studio on the Space's **Developers** page, under **API**; installing the Automation app creates it. Never commit it: set it in `.env` or as a build argument. Vite builds it into the page, so anyone who opens the inspector can read it; use a Space made for this. If you leave it empty, visitors paste their own. |
 | `VITE_MCP_URL` | Session MCP endpoint, when it is not `https://session-mcp.<session host>/mcp`. |
 
 All `VITE_*` values are read when the app is built, not when it runs, so changing one means building again.
 
-The `VITE_WIDGET_KEY_DEV` and `VITE_SPACE_ID_DEV` names from version 1 still work in `npm run dev`.
+The `VITE_SPACE_URL_DEV`, `VITE_WIDGET_KEY_DEV` and `VITE_SPACE_ID_DEV` names also work in `npm run dev`.
+
+The inspector embeds the Space link in its own iframe instead of using the Webfuse widget. That lets it grant the iframe the `tools` permission, which Chrome requires before a page in a frame may use its built-in WebMCP. The session is driven over the same `postMessage` API the widget uses.
 
 The Space's frame ancestors list must include the host the inspector runs on. A host given without a port only matches the default port, so `127.0.0.1` does not cover `127.0.0.1:5173`.
 
@@ -184,7 +187,7 @@ docker build -t webmcp-inspector --build-arg VITE_AUTOMATION_KEY=ak_… .
 docker run -p 8080:80 webmcp-inspector
 ```
 
-The build also accepts `VITE_WIDGET_KEY`, `VITE_SPACE_ID` and `VITE_MCP_URL` as build arguments. It runs the tests before building.
+The build also accepts `VITE_SPACE_URL`, `VITE_WIDGET_KEY`, `VITE_SPACE_ID` and `VITE_MCP_URL` as build arguments. It runs the tests before building.
 
 On Dokploy, set these under the application's **Environment → Build-time Arguments**, not as runtime environment variables, then redeploy. A runtime variable never reaches the built page.
 

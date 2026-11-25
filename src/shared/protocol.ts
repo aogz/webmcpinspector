@@ -51,7 +51,7 @@ export function unwrapMessage(args: unknown[]): Record<string, unknown> | null {
     if (!item || typeof item !== "object") continue;
     const obj = item as Record<string, unknown>;
     if (typeof obj.type === "string" && obj.type.startsWith("webmcp:")) return obj;
-    for (const key of ["data", "message", "payload"]) {
+    for (const key of ["data", "message", "payload", "msg"]) {
       if (obj[key] !== undefined) queue.push(obj[key]);
     }
   }

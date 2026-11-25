@@ -6,26 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebMCP Inspector - Inspect, debug & augment WebMCP tools on any page</title>
     <script defer data-domain="webmcpinspector.com" src="https://analytics.aogz.me/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
-    <script>
-      (function (w, e, b, f, u, s) {
-        w[f] = w[f] || {
-          initSpace: function () {
-            // Keep initSpace's own arguments: inside the executor, `arguments` would be
-            // (resolve, reject), and the loader would replay those as the widget key.
-            var args = arguments;
-            return new Promise(function (resolve) {
-              w[f].q = args;
-              w[f].resolve = resolve;
-            });
-          },
-        };
-        u = e.createElement(b);
-        s = e.getElementsByTagName(b)[0];
-        u.async = 1;
-        u.src = 'https://webfu.se/surfly.js';
-        s.parentNode.insertBefore(u, s);
-      })(window, document, 'script', 'webfuse');
-    </script>
   </head>
   <body>
     <div id="root"></div>

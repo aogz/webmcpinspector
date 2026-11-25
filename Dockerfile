@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG VITE_SPACE_URL
 ARG VITE_WIDGET_KEY
 ARG VITE_SPACE_ID
 ARG VITE_AUTOMATION_KEY

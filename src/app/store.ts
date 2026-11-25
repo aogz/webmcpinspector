@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { hostOf, track } from "../analytics";
-import { MCP_URL_OVERRIDE, SPACE_ID, WIDGET_KEY } from "../config";
+import { MCP_URL_OVERRIDE, SPACE_URL } from "../config";
 import { validate, type SchemaError } from "../shared/jsonSchema";
+import { SessionFrame } from "./sessionFrame";
 import { syncAddressBar, urlFromSearch } from "./shareLink";
 import { envelope, PROTOCOL_VERSION, unwrapMessage, type AppToPage } from "../shared/protocol";
 import type {
@@ -76,14 +77,6 @@ const MAX_ACTIVITY = 500;
 const MAX_CALLS = 200;
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
-function sessionOriginOf(session: WebfuseSession | null): string {
-  try {
-    return session ? new URL(session.sessionLink).origin : "";
-  } catch {
-    return "";
-  }
-}
-
 /** Webfuse's own pages, such as the Automation app's start page, are not pages anyone inspects. */
 export function isWebfusePage(url: string, sessionOrigin: string): boolean {
   try {
@@ -144,14 +137,11 @@ class InspectorStore {
     agentSent: "",
   };
   private listeners = new Set<() => void>();
-  private space: WebfuseSpace | null = null;
-  private session: WebfuseSession | null = null;
+  private session: SessionFrame | null = null;
   private activityId = 0;
   private waiters = new Map<string, (outcome: ExecuteOutcome) => void>();
   private restoredFor = "";
   private helloTimer = 0;
-  private infoTimer = 0;
-  private messageListener = (event: MessageEvent) => this.onWindowMessage(event);
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -225,35 +215,23 @@ class InspectorStore {
     }
 
     this.set({ status: "connecting", error: "" });
+    const frame = document.getElementById("webfuse-container") as HTMLIFrameElement | null;
+    const session = new SessionFrame(SPACE_URL);
     try {
-      if (!this.space) this.space = await window.webfuse.initSpace(WIDGET_KEY, SPACE_ID);
-      const session = this.space.session();
+      if (!frame) throw new Error("No session frame on the page.");
       this.session = session;
       this.bindSession(session);
-
-      // The session object passed to session_started is the one whose tab methods work.
-      const opened = new Promise<void>((resolve) => {
-        window.webfuse.on("session_started", (started: unknown) => {
-          void this.showInFirstTab(started as WebfuseSession, url, true).finally(resolve);
-        });
-      });
-      await session.start("#webfuse-container");
-      // The widget drives the frame without a src, so the session's origin comes from its link.
-      let origin = "";
-      try {
-        origin = new URL(session.sessionLink).origin;
-      } catch {
-        origin = "";
-      }
-      this.set({ status: "live", sessionOrigin: origin, spaceSlug: this.space.slug ?? "" });
+      await session.start(frame);
+      this.set({ status: "live", sessionOrigin: session.origin, spaceSlug: session.slug, sessionId: session.sessionId });
       this.log("session", "Session started");
       track("Connected", { host: hostOf(url) });
-      await opened;
+      await this.showInFirstTab(session, url, true);
       this.log("navigate", `Opened ${url}`);
       this.waitForExtension();
-      this.requestSessionInfo();
     } catch (err) {
       console.error("Failed to start the Webfuse session:", err);
+      session.stop();
+      this.session = null;
       this.set({
         status: "error",
         error:
@@ -268,7 +246,7 @@ class InspectorStore {
    * app, for one) start every session with a tab on their own start page, so opening another tab
    * would make the inspected page the second one.
    */
-  private async showInFirstTab(session: WebfuseSession, url: string, newSession: boolean) {
+  private async showInFirstTab(session: SessionFrame, url: string, newSession: boolean) {
     const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
     const listTabs = async () => {
       try {
@@ -277,7 +255,7 @@ class InspectorStore {
         return [];
       }
     };
-    const origin = sessionOriginOf(session);
+    const origin = session.origin;
     const settled = (tabUrl: string | undefined) => !!tabUrl && tabUrl !== "about:blank";
     const arrived = (tabUrl: string | undefined) =>
       sameDocument(tabUrl, url) || (settled(tabUrl) && !isWebfusePage(tabUrl ?? "", origin));
@@ -294,7 +272,7 @@ class InspectorStore {
       return;
     }
     rest.forEach((tab) => session.closeTab(tab.ssid));
-    session.activateTab?.(first.ssid);
+    session.activateTab(first.ssid);
     // A start page that finishes loading after our navigation replaces it, so check and retry.
     for (let attempt = 0; attempt < 4; attempt++) {
       await session.relocateTab(url, first.ssid);
@@ -311,21 +289,19 @@ class InspectorStore {
     this.set({ snapshot: null, extension: "waiting", injected: [], injectErrors: {} });
   }
 
-  private bindSession(session: WebfuseSession) {
-    window.addEventListener("message", this.messageListener);
-    session.on("message", (...args: unknown[]) => this.onSessionMessage(args));
+  private bindSession(session: SessionFrame) {
+    session.on("message", (params) => this.onSessionMessage([params]));
     session.on("session_ended", () => {
       clearInterval(this.helloTimer);
-      clearInterval(this.infoTimer);
-      window.removeEventListener("message", this.messageListener);
+      session.stop();
       this.session = null;
       this.set({ status: "ended", snapshot: null, sessionId: "", agentSent: "" });
       this.log("session", "Session ended");
       track("Disconnected");
     });
-    session.on("tab_relocated", (...args: unknown[]) => {
-      const event = args.find((a) => a && typeof a === "object" && "url" in (a as object)) as { url?: string } | undefined;
-      this.log("navigate", event?.url ? `Navigated to ${event.url}` : "Navigated");
+    session.on("tab_relocated", (params) => {
+      const url = typeof params.url === "string" ? params.url : "";
+      this.log("navigate", url ? `Navigated to ${url}` : "Navigated");
       if (this.state.agentSent) this.log("agent", "The session changed page after a prompt was sent to an agent.");
     });
   }
@@ -349,44 +325,9 @@ class InspectorStore {
     }, 1500);
   }
 
-  /** Same request the Webfuse widget makes; works even when the extension is outdated. */
-  private requestSessionInfo() {
-    clearInterval(this.infoTimer);
-    let tries = 0;
-    const ask = () => {
-      if (this.state.sessionId || ++tries > 40) {
-        clearInterval(this.infoTimer);
-        return;
-      }
-      if (!this.state.sessionOrigin && this.session?.sessionLink) {
-        try {
-          this.set({ sessionOrigin: new URL(this.session.sessionLink).origin });
-        } catch {
-          // Not a URL yet; try again on the next round.
-        }
-      }
-      const frame = document.getElementById("webfuse-container") as HTMLIFrameElement | null;
-      if (frame?.contentWindow && this.state.sessionOrigin) {
-        frame.contentWindow.postMessage({ type: "api_request", params: { cmd: "get_session_info" } }, this.state.sessionOrigin);
-      }
-      this.send({ type: "webmcp:session-info" });
-    };
-    ask();
-    this.infoTimer = window.setInterval(ask, 750);
-  }
-
-  private onWindowMessage(event: MessageEvent) {
-    if (!this.state.sessionOrigin || event.origin !== this.state.sessionOrigin) return;
-    const data = (event.data ?? {}) as { type?: string; params?: { msg?: string; sessionInfo?: { sessionId?: string } } };
-    if (data.type === "widget_message" && data.params?.msg === "get_session_info") {
-      const id = data.params.sessionInfo?.sessionId;
-      if (id && id !== this.state.sessionId) this.set({ sessionId: id });
-    }
-  }
-
   send(msg: AppToPage) {
     try {
-      this.session?.sendMessage(envelope(msg), "*");
+      this.session?.sendMessage(envelope(msg));
     } catch (err) {
       console.warn("sendMessage failed", err);
     }
