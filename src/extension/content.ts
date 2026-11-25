@@ -38,7 +38,7 @@ interface ToolDescriptor extends RegisteredLike {
 interface ModelContextLike extends Partial<EventTarget> {
   registerTool?: (tool: ToolDescriptor, options?: { signal?: AbortSignal; exposedTo?: string[] }) => unknown;
   getTools?: (options?: unknown) => Promise<RegisteredLike[]>;
-  executeTool?: (tool: unknown, input: unknown, options?: { signal?: AbortSignal }) => Promise<unknown>;
+  executeTool?: (tool: unknown, input: string, options?: { signal?: AbortSignal }) => Promise<unknown>;
 }
 
 interface TestingLike extends Partial<EventTarget> {
@@ -405,7 +405,9 @@ async function runTool(name: string, args: Record<string, unknown>, signal: Abor
   if (typeof mc?.executeTool === "function" && typeof mc.getTools === "function") {
     const tool = (await mc.getTools()).find((t) => t.name === name);
     if (tool) {
-      return { value: await abortable(mc.executeTool(tool, args, { signal }), signal), via: "document.modelContext.executeTool()" };
+      // The spec takes the input as a JSON string; Chrome rejects an object.
+      const input = JSON.stringify(args);
+      return { value: await abortable(mc.executeTool(tool, input, { signal }), signal), via: "document.modelContext.executeTool()" };
     }
   }
   const t = testing();

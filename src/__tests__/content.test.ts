@@ -27,8 +27,10 @@ class FakeModelContext extends EventTarget {
       annotations,
     }));
   }
+  // Like Chrome: the input must be a JSON string, and an object is rejected.
   async executeTool(tool: { name: string }, input: unknown) {
-    return JSON.stringify(await this.tools.get(tool.name)!.execute(input));
+    if (typeof input !== "string") throw new DOMException("Failed to parse input arguments", "UnknownError");
+    return JSON.stringify(await this.tools.get(tool.name)!.execute(JSON.parse(input)));
   }
 }
 
