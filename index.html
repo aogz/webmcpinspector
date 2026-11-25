@@ -10,8 +10,11 @@
       (function (w, e, b, f, u, s) {
         w[f] = w[f] || {
           initSpace: function () {
+            // Keep initSpace's own arguments: inside the executor, `arguments` would be
+            // (resolve, reject), and the loader would replay those as the widget key.
+            var args = arguments;
             return new Promise(function (resolve) {
-              w[f].q = arguments;
+              w[f].q = args;
               w[f].resolve = resolve;
             });
           },
