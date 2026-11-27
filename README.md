@@ -2,9 +2,11 @@
 
 Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools of any web page: run them, let models use them in a prompt debugger, check with evals that a model picks the right tool, and hand the live page to your own agent.
 
-The page opens in a [Webfuse](https://www.webfuse.com) session embedded right next to the inspector, so there is nothing to install. The page uses the browser's own WebMCP where it has one (Chrome), and Webfuse's polyfill everywhere else.
+There is no browser extension to install and nothing to change on the site. Paste a URL and the page opens in a [Webfuse](https://www.webfuse.com) session embedded right next to the inspector. The page uses the browser's own WebMCP where it has one (Chrome), and Webfuse's polyfill everywhere else.
 
-![WebMCP Inspector screenshot](./public/webmcpinspector.png)
+[![The demo: running a tool on Chrome Labs' flight search page](./public/demo-poster.jpg)](https://webmcpinspector.com/inspect/demo.mp4)
+
+▶ [Watch the 77-second demo](https://webmcpinspector.com/inspect/demo.mp4): open a page, run a tool, watch the tool list update, then the Score, Agent view, Build, Prompt and Connect your agent panels.
 
 Live: [webmcpinspector.com](https://webmcpinspector.com) · Test page that uses every WebMCP feature: [`kitchen-sink.html`](https://webmcpinspector.com/inspect/fixtures/kitchen-sink.html)
 
@@ -242,6 +244,7 @@ src/
     jsonSchema.ts         Validation, schema checks, example values
   __tests__/              Vitest suites
 public/
+  demo.mp4, demo-poster.jpg
   extension/manifest.json
   fixtures/kitchen-sink.html
   landing.html
