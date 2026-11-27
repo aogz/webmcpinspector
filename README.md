@@ -4,7 +4,7 @@ Inspect, test and improve the [WebMCP](https://webmachinelearning.github.io/webm
 
 There is no browser extension to install and nothing to change on the site. Paste a URL and the page opens in a [Webfuse](https://www.webfuse.com) session embedded right next to the inspector. The page uses the browser's own WebMCP where it has one (Chrome), and Webfuse's polyfill everywhere else.
 
-[![The demo: running a tool on Chrome Labs' flight search page](./public/demo-poster.jpg)](https://webmcpinspector.com/inspect/demo.mp4)
+![WebMCP Inspector listing the tools of Chrome Labs' flight search demo](./public/webmcpinspector.png)
 
 ▶ [Watch the 77-second demo](https://webmcpinspector.com/inspect/demo.mp4): open a page, run a tool, watch the tool list update, then the Score, Agent view, Build, Prompt and Connect your agent panels.
 
@@ -244,7 +244,7 @@ src/
     jsonSchema.ts         Validation, schema checks, example values
   __tests__/              Vitest suites
 public/
-  demo.mp4, demo-poster.jpg
+  demo.mp4
   extension/manifest.json
   fixtures/kitchen-sink.html
   landing.html
